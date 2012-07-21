@@ -45,7 +45,7 @@ done
 REPO_SRC_PATH=$PWD
 TODAY=`date +%Y-%m-%d`
 
-if [ "$OSTYPE" = "linux-gnu" ] ; then
+if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     TEMP_PATH_PREFIX=/tmp
     TEMP_PATH=$TEMP_PATH_PREFIX/necessitas
 else
@@ -53,12 +53,12 @@ else
     TEMP_PATH=$TEMP_PATH_PREFIX/nec
 fi
 
-if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ]; then
+if [ "$OSTYPE_MAJOR" = "darwin" ]; then
     # On Mac OS X, user accounts don't have write perms for /var, same is true for Ubuntu.
     sudo mkdir -p $TEMP_PATH
     sudo chmod 777 $TEMP_PATH
-    sudo mkdir -p $TEMP_PATH/out
-    sudo chmod 777 $TEMP_PATH/out
+    sudo mkdir -p $TEMP_PATH/out/necessitas
+    sudo chmod 777 $TEMP_PATH/out/necessitas
     STRIP="strip -S"
     CPRL="cp -RL"
 else
@@ -81,6 +81,7 @@ if [ ! -d $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas ]
 then
     mkdir -p $TEMP_PATH/out/necessitas/sdk_src
     cp -a $REPO_SRC_PATH/packages/* $TEMP_PATH/out/necessitas/sdk_src/
+    preparePackages
 fi
 REPO_PATH_PACKAGES=$TEMP_PATH/out/necessitas/sdk_src
 STATIC_QT_PATH=""
@@ -102,7 +103,7 @@ if [ "$OSTYPE" = "msys" ] ; then
     SCRIPT_EXT=.bat
     JOBS=`expr $NUMBER_OF_PROCESSORS + 2`
 else
-    if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ] ; then
+    if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
         HOST_CFG_OPTIONS=" -platform macx-g++42 -sdk /Developer/SDKs/MacOSX10.5.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
         HOST_QM_CFG_OPTIONS="CONFIG+=x86 CONFIG+=x86_64"
         # -reduce-exports doesn't work for static Mac OS X i386 build.
@@ -114,7 +115,7 @@ else
         JOBS=`sysctl -n hw.ncpu`
         JOBS=`expr $JOBS + 2`
     else
-        HOST_CFG_OPTIONS=" -platform linux-g++ -arch i386"
+        HOST_CFG_OPTIONS=" -platform linux-g++-64 -arch x86_64"
         HOST_TAG=linux-x86
         HOST_TAG_NDK=linux-x86
         SHLIB_EXT=.so
@@ -154,7 +155,7 @@ function downloadIfNotExists
 {
     if [ ! -f $1 ]
     then
-	    if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ] ; then
+    if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
             curl --insecure -S -L -O $2 || removeAndExit $1
         else
             wget --no-check-certificate -c $2 || removeAndExit $1
@@ -165,7 +166,7 @@ function downloadIfNotExists
 function doMake
 {
     MAKEPROG=make
-    if [ "$OSTYPE" = "msys" -o  "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ] ; then
+    if [ "$OSTYPE" = "msys" -o  "$OSTYPE_MAJOR" = "darwin" ] ; then
         if [ "$OSTYPE" = "msys" ] ; then
             MAKEDIR=`pwd -W`
             MAKEFOREVER=1
@@ -197,7 +198,7 @@ function doMake
 function doMakeInstall
 {
     MAKEPROG=make
-    if [ "$OSTYPE" = "msys" -o  "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ] ; then
+    if [ "$OSTYPE" = "msys" -o  "$OSTYPE_MAJOR" = "darwin" ] ; then
         if [ "$OSTYPE" = "msys" ] ; then
             MAKEDIR=`pwd -W`
             MAKEFOREVER=1
@@ -229,7 +230,7 @@ function doMakeInstall
 
 function doSed
 {
-    if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ]
+    if [ "$OSTYPE_MAJOR" = "darwin" ]
     then
         sed -i '.bak' "$1" $2
         rm ${2}.bak
@@ -268,7 +269,7 @@ function prepareHostQt
             OPTS_CFG=" -debug "
             HOST_QT_CFG="CONFIG+=debug"
         else
-            if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ] ; then
+            if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
                 OPTS_CFG=" -debug-and-release "
                 HOST_QT_CFG="CONFIG+=debug"
             fi
@@ -548,120 +549,88 @@ function makeInstallMinGWLibs
 function prepareNDKs
 {
     # repack official windows NDK
-    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data/android-ndk-${ANDROID_NDK_VERSION}-windows.7z ]
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}/data/android-ndk-${ANDROID_NDK_VERSION}-windows.7z ]
     then
         downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-windows.zip http://dl.google.com/android/ndk/android-ndk-${ANDROID_NDK_VERSION}-windows.zip
         rm -fr android-ndk-${ANDROID_NDK_VERSION}
         unzip android-ndk-${ANDROID_NDK_VERSION}-windows.zip
-        mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
-        createArchive android-ndk android-ndk-${ANDROID_NDK_VERSION}-windows.7z
-        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data
-        mv android-ndk-${ANDROID_NDK_VERSION}-windows.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data/android-ndk-${ANDROID_NDK_VERSION}-windows.7z
+        createArchive android-ndk-${ANDROID_NDK_VERSION} android-ndk-${ANDROID_NDK_VERSION}-windows.7z
+        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}/data
+        mv android-ndk-${ANDROID_NDK_VERSION}-windows.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}/data/android-ndk-${ANDROID_NDK_VERSION}-windows.7z
         rm -fr android-ndk
     fi
 
     # repack official mac NDK
-    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data/android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.7z ]
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}/data/android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.7z ]
     then
         downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.tar.bz2 http://dl.google.com/android/ndk/android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.tar.bz2
         rm -fr android-ndk-${ANDROID_NDK_VERSION}
         tar xjvf android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.tar.bz2
-        mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
-        createArchive android-ndk android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.7z
-        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data
-        mv android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data/android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.7z
+        createArchive android-ndk-${ANDROID_NDK_VERSION} android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.7z
+        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}/data
+        mv android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}/data/android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.7z
         rm -fr android-ndk
     fi
 
     # repack official linux-x86 NDK
-    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data/android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z ]
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}/data/android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z ]
     then
         downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-linux-x86.tar.bz2 http://dl.google.com/android/ndk/android-ndk-${ANDROID_NDK_VERSION}-linux-x86.tar.bz2
         rm -fr android-ndk-${ANDROID_NDK_VERSION}
         tar xjvf android-ndk-${ANDROID_NDK_VERSION}-linux-x86.tar.bz2
-        mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
-        createArchive android-ndk android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z
-        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data
-        mv android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data/android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z
+        createArchive android-ndk-${ANDROID_NDK_VERSION} android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z
+        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}/data
+        mv android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}/data/android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z
         rm -fr android-ndk
     fi
 
-# TODO Ray should uncomment/review it when Linaro toolchain is ready
-#     if [ $BUILD_ANDROID_GIT_NDK = 1 ]
-#     then
-#         downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-linux-x86.tar.bz2 http://dl.google.com/android/ndk/android-ndk-${ANDROID_NDK_VERSION}-linux-x86.tar.bz2
-#         rm -fr android-ndk-${ANDROID_NDK_VERSION}
-#         tar xjvf android-ndk-${ANDROID_NDK_VERSION}-linux-x86.tar.bz2
-#         $SDK_TOOLS_PATH/archivegen android-ndk-${ANDROID_NDK_VERSION} android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z
-#         mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data
-#         mv android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.official/data/android-ndk-${ANDROID_NDK_VERSION}-linux-x86.7z
-#         rm -fr android-ndk-${ANDROID_NDK_VERSION}
-#     fi
-#
-#     # mingw android NDKs are only r6 for now, not r6b.
-#     # repack mingw android windows NDK
-#     if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma_${ANDROID_NDK_MAJOR_VERSION}/data/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-windows.7z ]
-#     then
-#         downloadIfNotExists android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-windows.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-windows.7z
-# #        cp $REPO_SRC_PATH/ndk-packages/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-windows.7z .
-#         rm -fr android-ndk-${ANDROID_NDK_MAJOR_VERSION}
-#         7za x android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-windows.7z
-#         $SDK_TOOLS_PATH/archivegen android-ndk-${ANDROID_NDK_MAJOR_VERSION} android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-windows.7z
-#         mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma_${ANDROID_NDK_MAJOR_VERSION}/data
-#         mv android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-windows.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma_${ANDROID_NDK_MAJOR_VERSION}/data/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-windows.7z
-#         rm -fr android-ndk-${ANDROID_NDK_MAJOR_VERSION}
-#     fi
-#
-#     # repack mingw android mac NDK
-#     if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma_${ANDROID_NDK_MAJOR_VERSION}/data/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-darwin-x86.7z ]
-#     then
-#         downloadIfNotExists android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-darwin-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-darwin-x86.7z
-# #        cp $REPO_SRC_PATH/ndk-packages/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-darwin-x86.7z .
-#         rm -fr android-ndk-${ANDROID_NDK_MAJOR_VERSION}
-#         7za x android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-darwin-x86.7z
-#         $SDK_TOOLS_PATH/archivegen android-ndk-${ANDROID_NDK_MAJOR_VERSION} android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-darwin-x86.7z
-#         mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma_${ANDROID_NDK_MAJOR_VERSION}/data
-#         mv android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-darwin-x86.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma_${ANDROID_NDK_MAJOR_VERSION}/data/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-darwin-x86.7z
-#         rm -fr android-ndk-${ANDROID_NDK_MAJOR_VERSION}
-#     fi
-#
-#     # repack mingw android linux-x86 NDK
-#     if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma_${ANDROID_NDK_MAJOR_VERSION}/data/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-linux-x86.7z ]
-#     then
-#         downloadIfNotExists android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-linux-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-linux-x86.7z
-# #        cp $REPO_SRC_PATH/ndk-packages/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-linux-x86.7z .
-#         rm -fr android-ndk-${ANDROID_NDK_MAJOR_VERSION}
-#         7za x android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-linux-x86.7z
-#         $SDK_TOOLS_PATH/archivegen android-ndk-${ANDROID_NDK_MAJOR_VERSION} android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-linux-x86.7z
-#         mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma_${ANDROID_NDK_MAJOR_VERSION}/data
-#         mv android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-linux-x86.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma_${ANDROID_NDK_MAJOR_VERSION}/data/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-ma-linux-x86.7z
-#         rm -fr android-ndk-${ANDROID_NDK_MAJOR_VERSION}
-#     fi
-#
-#     export ANDROID_NDK_HOST=$HOST_TAG_NDK
-#     if [ "$USE_MA_NDK" = "0" ]; then
-#         ANDROID_NDK_VERSION=r6b
-#     else
-#         ANDROID_NDK_VERSION=r6
-#     fi
-#
-#     if [ $BUILD_ANDROID_GIT_NDK = 1 ]
-#     then
-#         export ANDROID_NDK_ROOT=$PWD/android-ndk-${ANDROID_NDK_VERSION}-git
-#         export ANDROID_NDK_FOLDER_NAME=android-ndk-${ANDROID_NDK_VERSION}-git
-#     else
-        export ANDROID_NDK_ROOT=$PWD/android-ndk
-        export ANDROID_NDK_FOLDER_NAME=android-ndk
-#     fi
+    # repack mingw android windows NDK
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data/android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z ]
+    then
+        downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
+        rm -fr android-ndk-${ANDROID_NDK_VERSION}
+        rm -fr android-ndk
+        7za x android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
+        mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
+        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data
+        createArchive android-ndk $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data/android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
+        rm -fr android-ndk
+    fi
 
-    if [ ! -d $ANDROID_NDK_FOLDER_NAME ]; then
+    # repack mingw android mac NDK
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data/android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z ]
+    then
+        downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
+        rm -fr android-ndk-${ANDROID_NDK_VERSION}
+        rm -fr android-ndk
+        7za x android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
+        mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
+        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data
+        createArchive android-ndk $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data/android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
+        rm -fr android-ndk
+    fi
+
+    # repack mingw android linux-x86 NDK
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data/android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z ]
+    then
+        downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
+        rm -fr android-ndk-${ANDROID_NDK_VERSION}
+        rm -fr android-ndk
+        7za x android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
+        mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
+        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data
+        createArchive android-ndk $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data/android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
+        rm -fr android-ndk
+    fi
+
+    if [ ! -d android-ndk-${ANDROID_NDK_VERSION} ]; then
         if [ "$USE_MA_NDK" = "0" ]; then
             if [ "$OSTYPE" = "msys" ]; then
                 downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-windows.zip http://dl.google.com/android/ndk/android-ndk-${ANDROID_NDK_VERSION}-windows.zip
                 unzip android-ndk-${ANDROID_NDK_VERSION}-windows.zip
             fi
 
-            if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ]; then
+            if [ "$OSTYPE_MAJOR" = "darwin" ]; then
                 downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.tar.bz2 http://dl.google.com/android/ndk/android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.tar.bz2
                 tar xjvf android-ndk-${ANDROID_NDK_VERSION}-darwin-x86.tar.bz2
             fi
@@ -672,34 +641,19 @@ function prepareNDKs
             fi
         else
             if [ "$OSTYPE" = "msys" ]; then
-                downloadIfNotExists android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-windows.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-windows.7z
-#                cp $REPO_SRC_PATH/ndk-packages/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-windows.7z .
-                7za x android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-windows.7z
+                downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
+                7za x android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
             fi
 
-            if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ]; then
-                downloadIfNotExists android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-darwin-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-darwin-x86.7z
-#                cp $REPO_SRC_PATH/ndk-packages/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-darwin-x86.7z .
-                7za x android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-darwin-x86.7z
+            if [ "$OSTYPE_MAJOR" = "darwin" ]; then
+                downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
+                7za x android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
             fi
 
             if [ "$OSTYPE" = "linux-gnu" ]; then
-                downloadIfNotExists android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-linux-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-linux-x86.7z
-#                cp $REPO_SRC_PATH/ndk-packages/android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-linux-x86.7z .
-                7za x android-ndk-${ANDROID_NDK_MAJOR_VERSION}-gdb-7.3.50.20110709-linux-x86.7z
+                downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
+                7za x android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
             fi
-        fi
-
-        if [ $BUILD_ANDROID_GIT_NDK = 1 ]
-        then
-            mv android-ndk-${ANDROID_NDK_VERSION} android-ndk-${ANDROID_NDK_VERSION}-git
-            git clone http://android.git.kernel.org/platform/ndk.git android_git_ndk || error_msg "Can't clone ndk"
-            pushd android_git_ndk
-                ./build/tools/rebuild-all-prebuilt.sh --ndk-dir=$ANDROID_NDK_ROOT --git-http --gdb-version=7.1 --sysroot=$USED_ANDROID_NDK_ROOT/platforms/android-9/arch-arm --verbose --package-dir=
-            popd
-            rm -fr android_git_ndk
-            mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}_git/data
-            createArchive android-ndk-${ANDROID_NDK_VERSION}-git $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}_git/data/android-ndk-${ANDROID_NDK_VERSION}-git-${HOST_TAG_NDK}.7z
         fi
     fi
     mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
@@ -828,7 +782,7 @@ function prepareGDB
             cp libpython$pyversion.dll $install_dir/lib/python$pyversion/
         fi
 
-        if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ] ; then
+        if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
             doSed $"s/python2\.7Mac/python2\.7/g" $install_dir/bin/2to3
             doSed $"s/python2\.7Mac/python2\.7/g" $install_dir/bin/idle
             doSed $"s/python2\.7Mac/python2\.7/g" $install_dir/bin/pydoc
@@ -851,7 +805,7 @@ function prepareGDB
     mkdir -p $target_dir/python/bin
     cp $install_dir/include/python$pyversion/pyconfig.h $target_dir/python/include/python$pyversion/
     # Remove the $SUFFIX if present (OS X)
-    if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ]; then
+    if [ "$OSTYPE_MAJOR" = "darwin" ]; then
         mv $install_dir/bin/python$pyversion$SUFFIX $install_dir/bin/python$pyversion
         mv $install_dir/bin/python$SUFFIX $install_dir/bin/python
     fi
@@ -883,7 +837,7 @@ function prepareGDB
         OLDPATH=$PATH
         export PATH=$install_dir/bin/:$PATH
         if [ -z $GDB_TARG_HOST_TAG ] ; then
-            CC=$CC32 CXX=$CXX32 CFLAGS="-O0 -g" $GDB_ROOT_PATH/configure --enable-initfini-array --enable-gdbserver=no --enable-tui=yes --with-sysroot=$TEMP_PATH/android-ndk-${ANDROID_NDK_VERSION}/platforms/android-9/arch-arm --with-python=$install_dir --with-expat=yes --with-libexpat-prefix=$install_dir --prefix=$target_dir --target=arm-elf-linux --host=$HOST --build=$HOST --disable-nls
+            CC=$CC32 CXX=$CXX32 CFLAGS="-O0 -g" $GDB_ROOT_PATH/configure --enable-initfini-array --enable-gdbserver=no --enable-tui=yes --with-sysroot=$TEMP_PATH/android-ndk/platforms/android-9/arch-arm --with-python=$install_dir --with-expat=yes --with-libexpat-prefix=$install_dir --prefix=$target_dir --target=arm-elf-linux --host=$HOST --build=$HOST --disable-nls
         else
             CC=$CC32 CXX=$CXX32 $GDB_ROOT_PATH/configure --enable-initfini-array --enable-gdbserver=no --enable-tui=yes --with-python=$install_dir --with-expat=yes --with-libexpat-prefix=$install_dir --prefix=$target_dir --target=$HOST --host=$HOST --build=$HOST --disable-nls
         fi
@@ -924,7 +878,7 @@ function prepareGDBServer
         return
     fi
 
-    export NDK_DIR=$TEMP_PATH/android-ndk-${ANDROID_NDK_VERSION}
+    export NDK_DIR=$TEMP_PATH/android-ndk
 
     mkdir gdb-build
     pushd gdb-build
@@ -941,11 +895,11 @@ function prepareGDBServer
     pushd gdb-src/build-gdbserver-$GDB_VER
 
     mkdir android-sysroot
-    $CPRL $TEMP_PATH/android-ndk-${ANDROID_NDK_VERSION}/platforms/android-9/arch-arm/* android-sysroot/ || error_msg "Can't copy android sysroot"
+    $CPRL $TEMP_PATH/android-ndk/platforms/android-9/arch-arm/* android-sysroot/ || error_msg "Can't copy android sysroot"
     rm -f android-sysroot/usr/lib/libthread_db*
     rm -f android-sysroot/usr/include/thread_db.h
 
-    TOOLCHAIN_PREFIX=$TEMP_PATH/android-ndk-${ANDROID_NDK_VERSION}/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$HOST_TAG_NDK/bin/arm-linux-androideabi
+    TOOLCHAIN_PREFIX=$TEMP_PATH/android-ndk/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$HOST_TAG_NDK/bin/arm-linux-androideabi
 
     OLD_CC="$CC"
     OLD_CFLAGS="$CFLAGS"
@@ -953,14 +907,14 @@ function prepareGDBServer
 
     export CC="$TOOLCHAIN_PREFIX-gcc --sysroot=$PWD/android-sysroot"
     if [ "$MAKE_DEBUG_GDBSERVER" = "1" ] ; then
-        export CFLAGS="-O0 -g -nostdlib -D__ANDROID__ -DANDROID -DSTDC_HEADERS -I$TEMP_PATH/android-ndk-${ANDROID_NDK_VERSION}/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/lib/gcc/arm-linux-androideabi/4.4.3/include -I$PWD/android-sysroot/usr/include -fno-short-enums"
+        export CFLAGS="-O0 -g -nostdlib -D__ANDROID__ -DANDROID -DSTDC_HEADERS -I$TEMP_PATH/android-ndk/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/lib/gcc/arm-linux-androideabi/4.4.3/include -I$PWD/android-sysroot/usr/include -fno-short-enums"
         export LDFLAGS="-static -Wl,-z,nocopyreloc -Wl,--no-undefined $PWD/android-sysroot/usr/lib/crtbegin_static.o -lc -lm -lgcc -lc $PWD/android-sysroot/usr/lib/crtend_android.o"
     else
-        export CFLAGS="-O2 -nostdlib -D__ANDROID__ -DANDROID -DSTDC_HEADERS -I$TEMP_PATH/android-ndk-${ANDROID_NDK_VERSION}/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/lib/gcc/arm-linux-androideabi/4.4.3/include -I$PWD/android-sysroot/usr/include -fno-short-enums"
+        export CFLAGS="-O2 -nostdlib -D__ANDROID__ -DANDROID -DSTDC_HEADERS -I$TEMP_PATH/android-ndk/toolchains/arm-linux-androideabi-4.4.3/prebuilt/linux-x86/lib/gcc/arm-linux-androideabi/4.4.3/include -I$PWD/android-sysroot/usr/include -fno-short-enums"
         export LDFLAGS="-static -Wl,-z,nocopyreloc -Wl,--no-undefined $PWD/android-sysroot/usr/lib/crtbegin_static.o -lc -lm -lgcc -lc $PWD/android-sysroot/usr/lib/crtend_android.o"
     fi
 
-    LIBTHREAD_DB_DIR=$TEMP_PATH/android-ndk-${ANDROID_NDK_VERSION}/sources/android/libthread_db/gdb-7.1.x
+    LIBTHREAD_DB_DIR=$TEMP_PATH/android-ndk/sources/android/libthread_db/gdb-7.1.x
     cp $LIBTHREAD_DB_DIR/thread_db.h android-sysroot/usr/include/
     $TOOLCHAIN_PREFIX-gcc$EXE_EXT --sysroot=$PWD/android-sysroot -o $PWD/android-sysroot/usr/lib/libthread_db.a -c $LIBTHREAD_DB_DIR/libthread_db.c || error_msg "Can't compile android threaddb"
     $GDB_ROOT_PATH/gdb/gdbserver/configure --host=arm-eabi-linux --with-libthread-db=$PWD/android-sysroot/usr/lib/libthread_db.a || error_msg "Can't configure gdbserver"
@@ -1226,7 +1180,7 @@ function compileNecessitasQt #params $1 architecture, $2 package path, $3 NDK_TA
          pushd ../qt-src
          git checkout -f mkspecs
          popd
-        ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 1 -q 1 -n $TEMP_PATH/android-ndk-${ANDROID_NDK_VERSION} -a $ANDROID_ARCH -k 0 -i $NQT_INSTALL_DIR || error_msg "Can't configure android-qt"
+        ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 1 -q 1 -n $TEMP_PATH/android-ndk -a $ANDROID_ARCH -k 0 -i $NQT_INSTALL_DIR || error_msg "Can't configure android-qt"
         echo "all done">all_done
     fi
 
@@ -1234,7 +1188,7 @@ function compileNecessitasQt #params $1 architecture, $2 package path, $3 NDK_TA
     rm -fr Android
     unset INSTALL_ROOT
     make QtJar
-    ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 0 -q 0 -n $TEMP_PATH/android-ndk-${ANDROID_NDK_VERSION} -a $ANDROID_ARCH -b 0 -k 1 -i $NQT_INSTALL_DIR || error_msg "Can't install android-qt"
+    ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 0 -q 0 -n $TEMP_PATH/android-ndk -a $ANDROID_ARCH -b 0 -k 1 -i $NQT_INSTALL_DIR || error_msg "Can't install android-qt"
 
     mkdir -p $2/$1
     cp -rf $NQT_INSTALL_DIR/bin $2/$1
@@ -1410,7 +1364,7 @@ function compileNecessitasQtWebkit
     export SQLITE3SRCDIR=$TEMP_PATH/$CHECKOUT_BRANCH/Android/Qt/$NECESSITAS_QT_VERSION_SHORT/qt-src/src/3rdparty/sqlite
     if [ ! -f all_done ]
     then
-        if [ "$OSTYPE" = "msys" ] ; then
+        if [ "$OSTYPE_MAJOR" = "msys" ] ; then
             which gperf && GPERF=1
             if [ ! "$GPERF" = "1" ] ; then
                 downloadIfNotExists gperf-3.0.4.tar.gz http://ftp.gnu.org/pub/gnu/gperf/gperf-3.0.4.tar.gz
@@ -1451,7 +1405,7 @@ function compileNecessitasQtWebkit
     qt_build_path=$TEMP_PATH/$CHECKOUT_BRANCH/Android/Qt/$NECESSITAS_QT_VERSION_SHORT/build-$1/install
     qt_build_path=${qt_build_path//\//\\\/}
     sed_cmd="s/$qt_build_path/\/data\/data\/org.kde.necessitas.ministro\/files\/qt/g"
-    if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ]; then
+    if [ "$OSTYPE_MAJOR" = "darwin" ]; then
         find . -name *.pc | xargs sed -i '.bak' $sed_cmd
         find . -name *.pc.bak | xargs rm -f
     else
@@ -1529,7 +1483,7 @@ function prepareOpenJDK
     WINE=0
     which wine && WINE=1
     if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.openjdk/data/openjdk-windows.7z ] ; then
-        if [ "$OSTYPE" = "msys" -o "$WINE" = "1" ] ; then
+        if [ "$OSTYPE_MAJOR" = "msys" -o "$WINE" = "1" ] ; then
             downloadIfNotExists oscg-openjdk6b21-1-windows-installer.exe http://oscg-downloads.s3.amazonaws.com/installers/oscg-openjdk6b21-1-windows-installer.exe
             rm -rf openjdk6b21-windows
             wine oscg-openjdk6b21-1-windows-installer.exe --unattendedmodeui none --mode unattended --prefix `pwd`/openjdk6b21-windows
@@ -1566,9 +1520,9 @@ function prepareAnt
     pushd ant
     if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ant/data/ant.7z ] ; then
         mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ant/data
-        downloadIfNotExists apache-ant-1.8.2-bin.tar.bz2 http://mirror.ox.ac.uk/sites/rsync.apache.org//ant/binaries/apache-ant-1.8.2-bin.tar.bz2
-        tar xjvf apache-ant-1.8.2-bin.tar.bz2
-        createArchive apache-ant-1.8.2 ant.7z
+        downloadIfNotExists apache-ant-1.8.4-bin.tar.bz2 http://mirror.ox.ac.uk/sites/rsync.apache.org//ant/binaries/apache-ant-1.8.4-bin.tar.bz2
+        tar xjvf apache-ant-1.8.4-bin.tar.bz2
+        createArchive apache-ant-1.8.4 ant.7z
         mv ant.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ant/data/
     fi
     popd
@@ -1620,9 +1574,10 @@ function setPackagesVariables
 
     patchPackage "@@NECESSITAS_QT_CREATOR_VERSION@@" $NECESSITAS_QT_CREATOR_VERSION "org.kde.necessitas.tools.qtcreator"
 
-    patchPackage "@@ANDROID_NDK_VERSION@@" $ANDROID_NDK_VERSION "org.kde.necessitas.misc.ndk.official"
-    patchPackage "@@ANDROID_NDK_MAJOR_VERSION@@" $ANDROID_NDK_MAJOR_VERSION "org.kde.necessitas.misc.ndk.official"
-    patchPackage "@@ANDROID_NDK_MAJOR_VERSION@@" $ANDROID_NDK_MAJOR_VERSION "org.kde.necessitas.misc.ndk.ma_r6"
+    patchPackage "@@ANDROID_NDK_VERSION@@" $ANDROID_NDK_VERSION "org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}"
+    patchPackage "@@ANDROID_NDK_VERSION@@" $ANDROID_NDK_VERSION "org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}"
+    patchPackage "@@ANDROID_NDK_VERSION@@" $ANDROID_NDK_VERSION "org.kde.necessitas.misc.ndk.ma"
+    patchPackage "@@ANDROID_NDK_VERSION@@" $ANDROID_NDK_VERSION "org.kde.necessitas.misc.ndk.ma"
 
     patchPackage "@@ANDROID_API_4_VERSION@@" $ANDROID_API_4_VERSION "org.kde.necessitas.misc.sdk.android_4"
     patchPackage "@@ANDROID_API_5_VERSION@@" $ANDROID_API_5_VERSION "org.kde.necessitas.misc.sdk.android_5"
@@ -1652,16 +1607,29 @@ function setPackagesVariables
 function prepareSDKBinary
 {
     $SDK_TOOLS_PATH/binarycreator -v -t $SDK_TOOLS_PATH/installerbase$EXE_EXT -c $REPO_SRC_PATH/config -p $REPO_PATH_PACKAGES -n $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$EXE_EXT org.kde.necessitas
+    # Work around mac bug. qt_menu.nib doesn't get copied to the build, nor to the app.
+    # https://bugreports.qt.nokia.com//browse/QTBUG-5952
+    if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+        pushd $REPO_SRC_PATH
+        $SHARED_QT_PATH/bin/macdeployqt necessitas-sdk-installer$HOST_QT_CONFIG.app
+        popd
+        cp -rf $QT_SRCDIR/src/gui/mac/qt_menu.nib $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG.app/Contents/Resources/
+    fi
     mkdir sdkmaintenance
     pushd sdkmaintenance
     rm -fr *.7z
-    if [ "$OSTYPE" = "msys" ] ; then
+    if [ "$OSTYPE_MAJOR" = "msys" ] ; then
         mkdir temp
         cp -a $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$EXE_EXT temp/SDKMaintenanceToolBase.exe
         createArchive temp sdkmaintenance-windows.7z
     else
-        cp -a $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$EXE_EXT .tempSDKMaintenanceTool
-        if [ "$OSTYPE" = "linux-gnu" ] ; then
+        if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+            cp -a $REPO_SRC_PATH/necessitas-sdk-installer${HOST_QT_CONFIG}.app .tempSDKMaintenanceTool
+        else
+            cp -a $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$EXE_EXT .tempSDKMaintenanceTool
+        fi
+
+        if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
                 createArchive . sdkmaintenance-linux-x86.7z
         else
                 createArchive . sdkmaintenance-darwin-x86.7z
@@ -1723,6 +1691,9 @@ function prepareMinistroRepository
             qmldirfileDirname=`dirname $qmldirfile`
             cp $qmldirfile $MINISTRO_OBJECTS_PATH/$qmldirfileDirname/
         done
+        if [ "$OSTYPE_MAJOR" = "msys" ] ; then
+            cp $REPO_SRC_PATH/ministrorepogen/release/ministrorepogen$EXE_EXT $REPO_SRC_PATH/ministrorepogen/ministrorepogen$EXE_EXT
+        fi
         $REPO_SRC_PATH/ministrorepogen/ministrorepogen$EXE_EXT $ANDROID_READELF_BINARY $MINISTRO_OBJECTS_PATH $MINISTRO_VERSION $architecture $REPO_SRC_PATH/ministrorepogen/rules-$platfromArchitecture.xml $MINISTRO_REPO_PATH/$CHECKOUT_BRANCH $repoVersion $MINISTRO_QT_VERSION
         popd
     done
@@ -1799,7 +1770,7 @@ function prepareWindowsPackages
 
 }
 
-if [ "$OSTYPE" = "msys" ] ; then
+if [ "$OSTYPE_MAJOR" = "msys" ] ; then
     makeInstallMinGWLibsAndTools
 fi
 prepareHostQt
@@ -1818,11 +1789,11 @@ prepareNecessitasQt
 # TODO :: Fix webkit build in Windows (-no-video fails) and Mac OS X (debug-and-release config incorrectly used and fails)
 # git clone often fails for webkit
 # Webkit is broken currently.
-#prepareNecessitasQtWebkit
+# prepareNecessitasQtWebkit
 
-if [ "$OSTYPE" != "msys" ] ; then
-    prepareNecessitasQtMobility # if [[ `gcc --version` =~ .*llvm.* ]]; => syntax error near `=~'
-fi
+#if [ "$OSTYPE_MAJOR" != "msys" ] ; then
+#    prepareNecessitasQtMobility # if [[ `gcc --version` =~ .*llvm.* ]]; => syntax error near `=~'
+#fi
 
 popd
 

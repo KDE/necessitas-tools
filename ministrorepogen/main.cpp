@@ -30,6 +30,8 @@
 #include <io.h>
 #endif
 
+#include <unistd.h>
+
 void printHelp()
 {
     qDebug()<<"Usage:./ministrorepogen <readelf executable path> <libraries path> <version> <abi version> <xml rules file> <output folder>  <out objects repo version> <qt version>";

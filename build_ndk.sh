@@ -205,12 +205,12 @@ function makeNDK
 
     mkdir build-${BUILD_NDK}
     pushd build-${BUILD_NDK}
-	if [ ! -d "development" ]
-	then
+    if [ ! -d "development" ]
+    then
         git clone git://android.git.kernel.org/platform/development.git development || error_msg "Can't clone development"
-	fi
-	if [ ! -d "ndk" ]
-	then
+    fi
+    if [ ! -d "ndk" ]
+    then
         git clone git://gitorious.org/mingw-android-ndk/mingw-android-ndk.git ndk || error_msg "Can't clone ndk"
     fi
     pushd ndk

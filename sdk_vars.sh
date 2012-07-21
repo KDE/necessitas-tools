@@ -1,5 +1,7 @@
 MINISTRO_VERSION="0.4" #Ministro repo version
 
+OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
+
 HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
 
 CHECKOUT_BRANCH="unstable"
@@ -22,9 +24,9 @@ NECESSITAS_QTMOBILITY_VERSION="1.2.0" #Necessitas QtMobility Version
 
 # NDK variables
 BUILD_ANDROID_GIT_NDK=0 # Latest and the greatest NDK built from sources
-ANDROID_NDK_MAJOR_VERSION=r8 # NDK major version, used by package name (and ma ndk)
-ANDROID_NDK_VERSION=r8 # NDK full package version
-USE_MA_NDK=0
+ANDROID_NDK_MAJOR_VERSION=r8b # NDK major version, used by package name (and ma ndk)
+ANDROID_NDK_VERSION=r8b # NDK full package version
+USE_MA_NDK=1
 
 # SDK variables
 ANDROID_SDK_VERSION=r20

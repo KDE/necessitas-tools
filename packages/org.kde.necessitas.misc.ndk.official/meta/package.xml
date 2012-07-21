@@ -2,12 +2,12 @@
 <Package>
     <DisplayName>Android NDK-@@ANDROID_NDK_VERSION@@</DisplayName>
     <Description>Android NDK-@@ANDROID_NDK_VERSION@@</Description>
-    <Version>6.1.2011.10.1</Version>
+    <Version>@@ANDROID_NDK_VERSION@@</Version>
     <ReleaseDate>@@TODAY@@</ReleaseDate>
-    <Name>org.kde.necessitas.misc.ndk.official</Name>
+    <Name>org.kde.necessitas.misc.ndk.@@ANDROID_NDK_VERSION@@</Name>
     <Script>installscript.qs</Script>
     <Dependencies>org.kde.necessitas.tools.qtcreator</Dependencies>
-    <Default>true</Default>
-    <InstallPriority>0</InstallPriority>
-    <SortingPriority>0</SortingPriority>
+    <Default>false</Default>
+    <InstallPriority>1</InstallPriority>
+    <SortingPriority>1</SortingPriority>
 </Package>

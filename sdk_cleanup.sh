@@ -1,4 +1,9 @@
 # remove things which are not ready for release
+function preparePackages
+{
+    mv $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.official $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}
+}
+
 function removeUnusedPackages
 {
     # x86 support needs much more love than just a compilation, QtCreator needs to handle it correctly

@@ -48,7 +48,7 @@ Component.prototype.createOperations = function()
     component.addOperation( "RegisterPersistentSettings",
                             "android.xml",
                             "AntLocation",
-                            "@TargetDir@/apache-ant-1.8.2/bin/"+OsToAnt() );
+                            "@TargetDir@/apache-ant-1.8.4/bin/"+OsToAnt() );
 }
 
 Component.prototype.isDefault = function()

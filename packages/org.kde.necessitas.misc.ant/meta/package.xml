@@ -2,7 +2,7 @@
 <Package>
     <DisplayName>Apache Ant</DisplayName>
     <Description>Apache Ant Build Tool, you need it ONLY if you don't have it already installed.</Description>
-    <Version>1.8.2</Version>
+    <Version>1.8.4</Version>
     <ReleaseDate>@@TODAY@@</ReleaseDate>
     <Name>org.kde.necessitas.misc.ant</Name>
     <Script>installscript.qs</Script>
