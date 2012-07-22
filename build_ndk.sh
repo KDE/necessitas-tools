@@ -286,7 +286,7 @@ fi
 if [ ! -z "$DARWINSDK" ] ; then
   if [ ! -d "$HOST_TOOLS/darwin/apple-osx" ] ; then
     mkdir -p $HOST_TOOLS/darwin
-    download http://mingw-and-ndk.googlecode.com/files/multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120531.tar.xz
+    download http://mingw-and-ndk.googlecode.com/files/multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120722.tar.xz
     tar -xJf multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120531.tar.xz -C $HOST_TOOLS/darwin
   fi
   export PATH=$HOST_TOOLS/darwin/apple-osx/bin:$PATH
