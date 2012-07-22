@@ -24,6 +24,7 @@ HOST_TOOLS=$BUILD_DIR/host_compiler_tools
 GCC_VER_LINARO=4.6-2012.07
 GCC_VER_LINARO_MAJOR=4.6
 GCC_VER_LINARO_LOCAL=4.6.3
+ARCHES="arm"
 
 case $OS in
     linux)
@@ -416,7 +417,7 @@ $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
   --package-dir=$PWD/release-$DATESUFFIX \
   --gdb-version=7.3.x \
   --build-dir=$GDB_BUILD_DIR \
-  --arch="arm mips x86" \
+  --arch="$ARCHES" \
   --python-build-dir=$PYTHON_BUILD_DIR \
   --python-version=2.7.3 \
    -j$JOBS
@@ -424,7 +425,7 @@ $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
 rm -rf /tmp/ndk-$USER/build/gdbserver*
 $NDK/build/tools/build-target-prebuilts.sh \
   --ndk-dir=$NDK \
-  --arch="arm mips x86" \
+  --arch="$ARCHES" \
   --package-dir=$PWD/release-$DATESUFFIX \
     $TC_SRC_DIR \
   -j$JOBS
