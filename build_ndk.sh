@@ -81,6 +81,11 @@ fail_panic ()
     fi
 }
 
+download ()
+{
+  curl -S -L -O $1
+}
+
 for opt; do
     optarg=`expr "x$opt" : 'x[^=]*=\(.*\)'`
     case $opt in
@@ -179,7 +184,7 @@ if [ ! -z "$DARWINSDK" ] ; then
        "$(bh_list_contains "darwin-x86_64" $SYSTEMS)" = "no" ] ; then
      log "You specified a --darwinsdk so"
      log " adding darwin-x86 to the SYSTEMS list"
-     SYSTEMS="$SYSTEMS "darwin
+     SYSTEMS="$SYSTEMS "darwin-x86
   fi
 else
   if [ ! "$(bh_list_contains "darwin-x86"    $SYSTEMS)" = "no" -a \
@@ -287,11 +292,6 @@ if [ ! -z "$DARWINSDK" ] ; then
   export DARWIN_TOOLCHAIN="i686-apple-darwin11"
   export DARWIN_SYSROOT="$DARWINSDK"
 fi
-
-download ()
-{
-  curl -S -L -O $1
-}
 
 if [ -z "$TC_SRC_DIR" ] ; then
   TC_SRC_DIR=$NDK_TOP/toolchain-source
