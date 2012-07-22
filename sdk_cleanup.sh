@@ -4,6 +4,8 @@ function preparePackages
     if [ ! -d $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION} ]
     then
         mv $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.official $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}
+    else
+       rm -fr $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.official
     fi
 }
 
