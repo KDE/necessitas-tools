@@ -1,352 +1,430 @@
-#!/bin/bash
+#!/bin/sh
 
-# Copyright (c) 2011, Ray Donnelly <mingw.android@gmail.com>
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License or (at your option) version 3 or any later version
-# accepted by the membership of KDE e.V. (or its successor approved
-# by the membership of KDE e.V.), which shall act as a proxy
-# defined in Section 14 of version 3 of the license.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# This script will mostly die eventually. Lots of it exists to patch up
+# small problems with new build_host scripts in Google's NDK. The goal
+# is that dev-rebuild-ndk.sh would be used once it uses the build_host
+# scripts.
 
-. ndk_vars.sh
+PROGNAME=$(basename $0)
+PROGDIR=$(dirname $0)
+PROGDIR=$(cd $PROGDIR && pwd)
 
-function error_msg
+# This will be reset later.
+LOG_FILE=/dev/null
+
+HELP=
+VERBOSE=1
+
+NDK_VER=r8b
+DATESUFFIX=$(date +%y%m%d)
+SYSTEMS=linux-x86,windows-x86
+BUILD_DIR=/tmp/necessitas
+BUILD_DIR_TMP=/tmp/necessitas/ndk-tmp
+HOST_TOOLS=$BUILD_DIR/host_compiler_tools
+GCC_VER_LINARO=4.6-2012.07
+GCC_VER_LINARO_MAJOR=4.6
+GCC_VER_LINARO_LOCAL=4.6.3
+
+case $OS in
+    linux)
+        NUM_CORES=$(grep -c -e '^processor' /proc/cpuinfo)
+        ;;
+    darwin|freebsd)
+        NUM_CORES=`sysctl -n hw.ncpu`
+        ;;
+    windows|cygwin)
+        NUM_CORES=$NUMBER_OF_PROCESSORS
+        ;;
+    *)
+        NUM_CORES=8
+        ;;
+esac
+
+if [ -z "$JOBS" ] ; then
+    JOBS=$NUM_CORES
+fi
+
+###############################################################
+# Shell script functions essential for processing the options #
+###############################################################
+
+log ()
 {
-    echo $1 >&2
+    if [ "$LOG_FILE" ]; then
+        echo "$@" > $LOG_FILE
+    fi
+    if [ "$VERBOSE" -gt 0 ]; then
+        echo "$@"
+    fi
+}
+
+info ()
+{
+    if [ "$LOG_FILE" ]; then
+        echo "$@" > $LOG_FILE
+    fi
+    if [ "$VERBOSE" -gt 1 ]; then
+        echo "$@"
+    fi
+}
+
+panic ()
+{
+    1>&2 echo "Error: $@"
     exit 1
 }
 
-function removeAndExit
+fail_panic ()
 {
-    rm -fr $1 && error_msg "Can't download $1"
+    if [ $? != 0 ]; then
+        panic "$@"
+    fi
 }
 
-function downloadIfNotExists
+for opt; do
+    optarg=`expr "x$opt" : 'x[^=]*=\(.*\)'`
+    case $opt in
+        -h|-?|--help) HELP=true;;
+        --verbose) VERBOSE=$(( $VERBOSE + 1 ));;
+        --quiet) VERBOSE=$(( $VERBOSE - 1 ));;
+        --binprefix=*) HOST_BINPREFIX=$optarg;;
+        --systems=*) SYSTEMS=$optarg;;
+        --darwinsdk=*) DARWINSDK=$optarg;;
+        --targets=*) TARGETS=$optarg;;
+        --arches=*) ARCHES=$optarg;;
+        --srcdir=*) TC_SRC_DIR=$optarg;;
+        --linaro) LINARO=yes;;
+        -j*|--jobs=*) JOBS=$optarg;;
+        --package-dir=*) PACKAGE_DIR=$optarg;;
+        -*) panic "Unknown option '$opt', see --help for list of valid ones.";;
+        *) panic "This script doesn't take any parameter, see --help for details.";;
+    esac
+done
+
+# Translate commas to spaces
+# Usage: str=`commas_to_spaces <list>`
+commas_to_spaces ()
 {
-    if [ ! -f $1 ]
-    then
-            if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ] ; then
-            curl --insecure -S -L -O $2 || removeAndExit $1
-        else
-            wget --no-check-certificate -c $2 || removeAndExit $1
+    echo "$@" | tr ',' ' '
+}
+
+# Translate spaces to commas
+# Usage: list=`spaces_to_commas <string>`
+spaces_to_commas ()
+{
+    echo "$@" | tr ' ' ','
+}
+
+# $1 is the string to search for
+# $2... is the list to search in
+# Returns first, yes or no.
+bh_list_contains ()
+{
+  local SEARCH="$1"
+  shift
+  # For dash, this has to be split over 2 lines.
+  # Seems to be a bug with dash itself:
+  # https://bugs.launchpad.net/ubuntu/+source/dash/+bug/141481
+  local LIST
+  LIST=$@
+  local RESULT=first
+  # Pull out the host if there
+  for ELEMENT in $LIST; do
+    if [ "$ELEMENT" = "$SEARCH" ]; then
+      echo $RESULT
+      return 0
+    fi
+    RESULT=yes
+  done
+  echo no
+  return 1
+}
+
+###################
+# Build OS checks #
+###################
+
+# For now, only tested on Linux
+OS=$(uname -s)
+EXEEXT= # executable extension
+case $OS in
+    Linux) OS=linux;;
+    Darwin) OS=darwin;;
+    CYGWIN*|*_NT-*) OS=windows;
+        if [ "$OSTYPE" = cygwgin ]; then
+            OS=cygwin
         fi
-    fi
-}
+        EXEEXT=.exe
+        ;;
+esac
 
-function makeInstallPython
-{
-    if [ ! -f $REPO_SRC_PATH/python-${BUILD_PYTHON}.7z ]
-    then
-        if [ ! -d Python-2.7.1 ]
-        then
-            git clone git://gitorious.org/mingw-python/mingw-python.git Python-2.7.1 || error_msg "Can't clone Python"
-        fi
-        pushd Python-2.7.1
-        mkdir python-build
-        pushd python-build
-#        ../build-python.sh --with-pydebug
-        ../build-python.sh
-        # If successful, the build is packaged into /usr/ndk-build/python-mingw.7z
-        cp ../python-${BUILD_PYTHON}.7z $REPO_SRC_PATH/
-        popd
-        popd
-    fi
-}
+BUILD_ARCH=$(uname -m)
+case $BUILD_ARCH in
+    i?86) BUILD_ARCH=x86;;
+    amd64) BUILD_ARCH=x86_64;;
+esac
 
-function makeInstallMinGWBits
-{
-    if [ ! -f /usr/lib/libcurses.a ] ; then
-        wget -c http://downloads.sourceforge.net/pdcurses/pdcurses/3.4/PDCurses-3.4.tar.gz
-        rm -rf PDCurses-3.4
-        tar -xvzf PDCurses-3.4.tar.gz
-        pushd PDCurses-3.4/win32
-        sed '90s/-copy/-cp/' mingwin32.mak > mingwin32-fixed.mak
-        make -f mingwin32-fixed.mak WIDE=Y UTF8=Y DLL=N
-        cp pdcurses.a /usr/lib/libcurses.a
-        cp pdcurses.a /usr/lib/libncurses.a
-        cp pdcurses.a /usr/lib/libpdcurses.a
-        cp ../curses.h /usr/include
-        cp ../panel.h /usr/include
-        popd
-    fi
+if [ "$OS" != "linux" ]; then
+    panic "Error: This script only works on Linux."
+fi
 
-    if [ ! -f /usr/lib/libreadline.a ] ; then
-        wget -c http://ftp.gnu.org/pub/gnu/readline/readline-6.2.tar.gz
-        rm -rf readline-6.2
-        tar -xvzf readline-6.2.tar.gz
-        pushd readline-6.2
-        CFLAGS=-O2 && ./configure --enable-static --disable-shared --with-curses --enable-multibyte --prefix=/usr CFLAGS=-O2
-        make && make install
-        popd
-    fi
+SYSTEMS=$(commas_to_spaces $SYSTEMS)
 
-    if [ ! -d android-various ] ; then
-        git clone git://gitorious.org/mingw-android-various/mingw-android-various.git android-various || error_msg "Can't clone android-various"
-    fi
+#####################
+# Darwin SDK checks #
+#####################
 
-    if [ ! -f $REPO_SRC_PATH/make.exe ] ; then
-        mkdir -p android-various/make-3.82-build
-        pushd android-various/make-3.82-build
-        ../make-3.82/build-mingw.sh
-        cp make.exe $REPO_SRC_PATH/
-        popd
-    fi
-
-    pushd android-various/android-sdk
-    gcc -Wl,-subsystem,windows -Wno-write-strings android.cpp -static-libgcc -s -O3 -o android.exe 
-    cp android.exe $REPO_SRC_PATH/
-    popd
-}
-
-function makeNDKForArch
-{
-    ARCH=$1
-    ROOTDIR=$2
-    REPO_SRC_PATH=$3
-    if [ "$ARCH" = "arm" ] ; then
-        ARCH_ABI=$ARCH-linux-androideabi
-    else
-        ARCH_ABI=$ARCH
-    fi
-#    if [ ! -f $ROOTDIR/${ARCH_ABI}-4.4.3-gdbserver.tar.bz2 -o ! -f $ROOTDIR/${ARCH_ABI}-4.4.3-${BUILD_NDK}.tar.bz2 ]; then
-    if [ ! -f $ROOTDIR/${ARCH_ABI}-4.4.3-${BUILD_NDK}.tar.bz2 ]; then
-        $NDK/build/tools/rebuild-all-prebuilt.sh --arch=$ARCH --patches-dir=$NDK/build/tools/toolchain-patches --build-dir=$ROOTDIR/ndk-toolchain-${BUILD}-build-tmp --verbose --package-dir=$ROOTDIR --gdb-path=$GDB_ROOT_PATH --gdb-version=$GDB_VER --mpfr-version=2.4.2 --gmp-version=4.2.4 --binutils-version=2.20.1 --toolchain-src-dir=$TCSRC --gdb-with-python=$PYTHONVER --only-latest
-    else
-        echo "Skipping NDK build, already done."
-        echo $ROOTDIR/${ARCH_ABI}-4.4.3-${BUILD_NDK}.tar.bz2
-    fi
-    cp $ROOTDIR/${ARCH_ABI}-4.4.3-${BUILD_NDK}.tar.bz2 $REPO_SRC_PATH/${ARCH_ABI}-4.4.3-${BUILD_NDK}.tar.bz2
-    cp $ROOTDIR/${ARCH_ABI}-4.4.3-gdbserver.tar.bz2 $REPO_SRC_PATH/${ARCH_ABI}-4.4.3-gdbserver.tar.bz2
-}
-
-function makeNDK
-{
-    PYTHONVER=`pwd`/Python-2.7.1/python-build/install-python-${BUILD_PYTHON}
-    mkdir src
-    pushd src
-#   PYTHONVER=$PWD/python-install
-
-    if [ ! -d $PYTHONVER ] ; then
-        if [ -f $REPO_SRC_PATH/python-${BUILD_PYTHON}.7z ]; then
-            mkdir -p $PYTHONVER
-            pushd $PYTHONVER
-                7za x $REPO_SRC_PATH/python-${BUILD_PYTHON}.7z
-                PYTHONVER=`pwd`
-            popd
-        fi
-    fi
-
-    if [ ! -d "mpfr" ]
-    then
-        git clone git://android.git.kernel.org/toolchain/mpfr.git mpfr || error_msg "Can't clone mpfr"
-        pushd mpfr
-        downloadIfNotExists mpfr-2.4.2.tar.bz2 http://www.mpfr.org/mpfr-2.4.2/mpfr-2.4.2.tar.bz2
-        popd
-    fi
-    if [ ! -d "binutils" ]
-    then
-        git clone git://android.git.kernel.org/toolchain/binutils.git binutils || error_msg "Can't clone binutils"
-    fi
-    if [ ! -d "gmp" ]
-    then
-        git clone git://android.git.kernel.org/toolchain/gmp.git gmp || error_msg "Can't clone gmp"
-    fi
-    if [ ! -d "gold" ]
-    then
-        git clone git://android.git.kernel.org/toolchain/gold.git gold || error_msg "Can't clone gold"
-    fi
-    if [ ! -d "build" ]
-    then
-        git clone git://gitorious.org/toolchain-mingw-android/mingw-android-toolchain-build.git build || error_msg "Can't clone build"
-        git reset --hard
-    fi
-    # reset so that ndk r6 patches apply.
-    pushd build
-        git reset --hard
-    popd
-    if [ ! -d "gcc" ]
-    then
-        git clone git://gitorious.org/toolchain-mingw-android/mingw-android-toolchain-gcc.git gcc || error_msg "Can't clone gcc"
-    fi
-    # reset so that ndk r6 patches apply (usually this will undo the previously applied patches).
-    pushd gcc
-        git reset --hard
-        git checkout --force integration
-        if [ -n "$GCC_GIT_DATE" ] ; then
-            REVISION=`git rev-list -n 1 --until="$GCC_GIT_DATE" HEAD`
-            echo "Using sources for date '$GCC_GIT_DATE': toolchain/$1 revision $REVISION"
-            git checkout $REVISION
-        fi
-    popd
-
-    mkdir gdb
-    if [ ! -d "ma-gdb" ]
-    then
-        git clone git://gitorious.org/toolchain-mingw-android/mingw-android-toolchain-gdb.git ma-gdb || error_msg "Can't clone gdb"
-    fi
-    pushd ma-gdb
-        git checkout $GDB_BRANCH
-        git reset --hard
-        GDB_ROOT_PATH=$PWD/$GDB_ROOT_PATH
-    popd
-
-    TCSRC=$PWD
-    popd
-
-    mkdir build-${BUILD_NDK}
-    pushd build-${BUILD_NDK}
-    if [ ! -d "development" ]
-    then
-        git clone git://android.git.kernel.org/platform/development.git development || error_msg "Can't clone development"
-    fi
-    if [ ! -d "ndk" ]
-    then
-        git clone git://gitorious.org/mingw-android-ndk/mingw-android-ndk.git ndk || error_msg "Can't clone ndk"
-    fi
-    pushd ndk
-        git checkout -b integration origin/integration
-    popd
-    export NDK=$PWD/ndk
-    export ANDROID_NDK_ROOT=$NDK
-    $NDK/build/tools/build-platforms.sh --arch="arm" --verbose
-
-    ROOTDIR=$PWD
-    RELEASE=`date +%Y%m%d`
-    NDK=`pwd`/ndk
-    ANDROID_NDK_ROOT=$NDK
-
-    echo GDB_ROOT_PATH $GDB_ROOT_PATH
-    PYTHONHOME=""
-    unset PYTHONHOME
-    makeNDKForArch arm $ROOTDIR $REPO_SRC_PATH
-    makeNDKForArch x86 $ROOTDIR $REPO_SRC_PATH
-}
-
-# This also copies the new libstdc++'s over the old ones (the NDK's build scripts are
-# buggy (--keep-libstdc++ doesn't work right).
-function mixPythonWithNDK
-{
-    if [ ! -f $REPO_SRC_PATH/python-${BUILD_PYTHON}.7z ]; then
-       echo "Failed to find python, $REPO_SRC_PATH/python-${BUILD_PYTHON}.7z"
-    fi
-    if [ ! -f $REPO_SRC_PATH/arm-linux-androideabi-4.4.3-gdbserver.tar.bz2 ]; then
-       echo "Failed to find arm gdbserver, $REPO_SRC_PATH/arm-linux-androideabi-4.4.3-gdbserver.tar.bz2"
-    fi
-    if [ ! -f $REPO_SRC_PATH/arm-linux-androideabi-4.4.3-${BUILD_NDK}.tar.bz2 ]; then
-       echo "Failed to find arm toolchain, $REPO_SRC_PATH/arm-linux-androideabi-4.4.3-${BUILD_NDK}.tar.bz2"
-    fi
-    if [ ! -f $REPO_SRC_PATH/x86-4.4.3-gdbserver.tar.bz2 ]; then
-       echo "Failed to find x86 gdbserver, $REPO_SRC_PATH/x86-linux-androideabi-4.4.3-gdbserver.tar.bz2"
-    fi
-    if [ ! -f $REPO_SRC_PATH/x86-4.4.3-${BUILD_NDK}.tar.bz2 ]; then
-       echo "Failed to find x86 toolchain, $REPO_SRC_PATH/x86-linux-androideabi-4.4.3-${BUILD_NDK}.tar.bz2"
-    fi
-    mkdir -p /tmp/android-ndk-${NDK_VER}-${BUILD_NDK}-repack
-    rm -rf /tmp/android-ndk-${NDK_VER}-${BUILD_NDK}-repack/android-ndk-${NDK_VER}
-    pushd /tmp/android-ndk-${NDK_VER}-${BUILD_NDK}-repack
-    if [ "$OSTYPE" = "msys" ] ; then
-        downloadIfNotExists android-ndk-${NDK_VER}-windows.zip http://dl.google.com/android/ndk/android-ndk-${NDK_VER}-windows.zip
-        unzip android-ndk-${NDK_VER}-windows.zip
-    else
-        if [ "$OSTYPE" = "linux-gnu" ] ; then
-            downloadIfNotExists android-ndk-${NDK_VER}-linux-x86.tar.bz2 http://dl.google.com/android/ndk/android-ndk-${NDK_VER}-linux-x86.tar.bz2
-            tar xjvf android-ndk-${NDK_VER}-linux-x86.tar.bz2
-        else
-            downloadIfNotExists android-ndk-${NDK_VER}-darwin-x86.tar.bz2 http://dl.google.com/android/ndk/android-ndk-${NDK_VER}-darwin-x86.tar.bz2
-            tar xjvf android-ndk-${NDK_VER}-darwin-x86.tar.bz2
-        fi
-    fi
-    pushd android-ndk-${NDK_VER}
-    tar -jxvf $REPO_SRC_PATH/arm-linux-androideabi-4.4.3-${BUILD_NDK}.tar.bz2
-    tar -jxvf $REPO_SRC_PATH/x86-4.4.3-${BUILD_NDK}.tar.bz2
-    # The official NDK uses thumb version of libstdc++ for armeabi and
-    # an arm version for armeabi-v7a, so copy the appropriate one over.
-    cp toolchains/arm-linux-androideabi-4.4.3/prebuilt/${BUILD_NDK}/arm-linux-androideabi/lib/thumb/libstdc++.* sources/cxx-stl/gnu-libstdc++/libs/armeabi/
-    cp toolchains/arm-linux-androideabi-4.4.3/prebuilt/${BUILD_NDK}/arm-linux-androideabi/lib/armv7-a/libstdc++.* sources/cxx-stl/gnu-libstdc++/libs/armeabi-v7a/
-    cp toolchains/x86-4.4.3/prebuilt/${BUILD_NDK}/i686-android-linux/lib/ibstdc++.* sources/cxx-stl/gnu-libstdc++/libs/x86/
-    tar -jxvf $REPO_SRC_PATH/arm-linux-androideabi-4.4.3-gdbserver.tar.bz2
-    tar -jxvf $REPO_SRC_PATH/x86-4.4.3-gdbserver.tar.bz2
-    if [ -d toolchains/arm-linux-androideabi-4.4.3/prebuilt/${BUILD_NDK} ] ; then
-        pushd toolchains/arm-linux-androideabi-4.4.3/prebuilt/${BUILD_NDK}
-            7za x $REPO_SRC_PATH/python-${BUILD_PYTHON}.7z
-        popd
-    fi
-    if [ -d toolchains/x86-4.4.3/prebuilt/${BUILD_NDK} ] ; then
-        pushd toolchains/x86-4.4.3/prebuilt/${BUILD_NDK}
-            7za x $REPO_SRC_PATH/python-${BUILD_PYTHON}.7z
-        popd
-    fi
-    # Get rid of old and unused stuff.
-    rm -rf toolchains/arm-eabi-4.4.0
-#    rm -rf toolchains/x86-4.4.3
-    popd
-    7za a -mx9 android-ndk-${NDK_VER}-gdb-${GDB_VER}-${BUILD_NDK}.7z android-ndk-${NDK_VER}
-    mv android-ndk-${NDK_VER}-gdb-${GDB_VER}-${BUILD_NDK}.7z $REPO_SRC_PATH
-    popd
-}
-
-if [ "$OSTYPE" = "linux-gnu" ] ; then
-    BUILD=linux
-    BUILD_NDK=linux-x86
-    BUILD_PYTHON=$BUILD
+if [ ! -z "$DARWINSDK" ] ; then
+  if [ "$(bh_list_contains "darwin-x86"    $SYSTEMS)" = "no" -a \
+       "$(bh_list_contains "darwin-x86_64" $SYSTEMS)" = "no" ] ; then
+     log "You specified a --darwinsdk so"
+     log " adding darwin-x86 to the SYSTEMS list"
+     SYSTEMS="$SYSTEMS "darwin
+  fi
 else
-    if [ "$OSTYPE" = "msys" ] ; then
-    BUILD=windows
-    BUILD_NDK=windows
-    BUILD_PYTHON=mingw
-    else
-        BUILD=macosx
-        BUILD_NDK=darwin-x86
-        BUILD_PYTHON=$BUILD
-    fi
+  if [ ! "$(bh_list_contains "darwin-x86"    $SYSTEMS)" = "no" -a \
+     ! ! "$(bh_list_contains "darwin-x86_64" $SYSTEMS)" = "no" ] ; then
+     log "You included darwin in the --systems list,"
+     log " but didn't provide a --darwinsdk. Assuming:"
+     log "  $HOST_TOOLS/darwin/MacOSX10.7.sdk"
+     DARWINSDK=$HOST_TOOLS/darwin/MacOSX10.7.sdk
+  fi
 fi
 
-if [ "$OSTYPE" = "linux-gnu" ]; then
-    TEMP_PATH=/usr/ndk-build
-else
-    TEMP_PATH=/usr/ndk-build
-    if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ] ; then
-        sudo mkdir -p $TEMP_PATH
-        sudo chown `whoami` $TEMP_PATH
-    fi
+if [ ! -z "$DARWINSDK" -a ! -d "$DARWINSDK" ] ; then
+  log "darwinsdk folder $DARWINSDK doesn't exist,"
+  log " It should be e.g. MacOSX10.7.sdk"
+  panic " Speak to a friendly Mac owner?"
 fi
 
-REPO_SRC_PATH=`pwd`/ndk-packages
-mkdir $REPO_SRC_PATH
-PYTHONVER=/usr
-mkdir $TEMP_PATH
-pushd $TEMP_PATH
-
-#cp -rf /usr/ndk-build-old/src .
-#mkdir build-windows
-#cp -rf /usr/ndk-build-old/build-windows/ndk ./build-windows
-#cp -rf /usr/ndk-build-old/build-windows/development ./build-windows
-
-if [ "$OSTYPE" = "msys" ] ; then
-    makeInstallMinGWBits
+if [ "$HELP" ] ; then
+    echo "Usage: $PROGNAME [options]"
+    echo ""
+    echo "This program is used to rebuild a mingw64 cross-toolchain from scratch."
+    echo ""
+    echo "Valid options:"
+    echo "  -h|-?|--help                 Print this message."
+    echo "  --verbose                    Increase verbosity."
+    echo "  --quiet                      Decrease verbosity."
+    echo "  --systems=<num>              Comma separated list of host systems [$SYSTEMS]."
+    echo "  --jobs=<num>                 Run <num> build tasks in parallel [$JOBS]."
+    echo "  -j<num>                      Same as --jobs=<num>."
+    echo "  --binprefix=<prefix>         Specify bin prefix for host toolchain."
+    echo "  --disable-32bit              Disable 32bit host tools build."
+    echo "  --enable-64bit               Enable 64bit host tools build."
+    echo "  --target-arch=<arch>         Select default target architecture [$TARGET_ARCH]."
+    echo "  --force-all                  Redo everything from scratch."
+    echo "  --force-build                Force a rebuild (keep sources)."
+    echo "  --cleanup                    Remove all temp files after build."
+    echo "  --work-dir=<path>            Specify work/build directory [$TEMP_DIR]."
+    echo "  --package-dir=<path>         Package toolchain to directory."
+    echo ""
+    exit 0
 fi
 
-if [ "$OSTYPE" = "darwin9.0" -o "$OSTYPE" = "darwin10.0" ] ; then
-    if [ ! -f /usr/local/bin/7za ] ; then
-        downloadIfNotExists p7zip-macosx.tar.bz2 http://mingw-and-ndk.googlecode.com/files/p7zip-macosx.tar.bz2
-        tar xjvf p7zip-macosx.tar.bz2
-        chmod 755 opt/bin/7za
-        cp opt/bin/7za /usr/local/bin
-    fi
+###########################################
+# Clone the android-qt-ndk git repository #
+###########################################
+
+NDK_TOP="$BUILD_DIR"/android-qt-ndk
+mkdir -p "$NDK_TOP"
+NDK=$NDK_TOP/ndk
+mkdir -p $(dirname "$NDK")
+NDK_PLATFORM=$BUILD_DIR/ndk_meta
+if [ ! -d $NDK ] ; then
+  git clone http://anongit.kde.org/android-qt-ndk.git $NDK
+  fail_panic "Couldn't clone android-qt-ndk"
 fi
 
-makeInstallPython
-makeNDK
-mixPythonWithNDK
+if [ ! -d $NDK_TOP/development ] ; then
+    git clone http://android.googlesource.com/platform/development.git $NDK_TOP/development
+fi
 
-popd
+########################################################
+# Get (or build) the required per-host cross compilers #
+########################################################
+
+# We don't need Google's special glibc2.7 linux GCCs if we're in BogDan's
+# Debian env.
+# Otherwise, we use it, assuming that Linux is the only OS worth doing
+# this kind of cross compilation task on (IMHO, it is).
+DEBIAN_VERSION=
+if [ -f /etc/debian_version ] ; then
+  DEBIAN_VERSION=$(head -n 1 /etc/debian_version)
+fi
+
+# BINPREFIX is needed for building highly compatiable mingw-w64 toolchains.
+BINPREFIX=
+if [ ! "$DEBIAN_VERSION" = "6.0.5" ] ; then
+  (mkdir -p $HOST_TOOLS/linux; cd /tmp; \
+   download http://mingw-and-ndk.googlecode.com/files/i686-w64-mingw32-linux-i686-glibc2.7.tar.bz2; z
+   tar -xjf i686-w64-mingw32-linux-i686-glibc2.7.tar.bz2 -C $HOST_TOOLS/linux/)
+  export PATH=$HOST_TOOLS/linux/i686-linux-glibc2.7-4.4.3/bin:$PATH
+  BINPREFIX=--binprefix=i686-linux
+fi
+
+# Check MinGW (and possibly build the cross compiler)
+if [ ! "$(bh_list_contains "windows-x86"    $SYSTEMS)" = "no" -o \
+     ! "$(bh_list_contains "windows-x86_64" $SYSTEMS)" = "no" ] ; then
+  if [ ! -d "$HOST_TOOLS/mingw" ] ; then
+    $NDK/build/tools/build-mingw64-toolchain.sh --target-arch=i686 --package-dir=i686-w64-mingw32-toolchain $BINPREFIX
+    fail_panic "Couldn't build mingw-w64 toolchain"
+    mkdir -p $HOST_TOOLS/mingw
+    tar -xjf i686-w64-mingw32-toolchain/*.tar.bz2 -C $HOST_TOOLS/mingw
+  fi
+  export PATH=$HOST_TOOLS/mingw/i686-w64-mingw32/bin:$PATH
+fi
+
+# By this point, having anything is DARWINSDK can be taken to mean that
+# darwin build(s) are required.
+if [ ! -z "$DARWINSDK" ] ; then
+  if [ ! -d "$HOST_TOOLS/darwin/apple-osx" ] ; then
+    mkdir -p $HOST_TOOLS/darwin
+    download http://mingw-and-ndk.googlecode.com/files/multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120531.tar.xz
+    tar -xJf multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120531.tar.xz -C $HOST_TOOLS/darwin
+  fi
+  export PATH=$HOST_TOOLS/darwin/apple-osx/bin:$PATH
+  export DARWIN_TOOLCHAIN="i686-apple-darwin11"
+  export DARWIN_SYSROOT="$DARWINSDK"
+fi
+
+download ()
+{
+  curl -S -L -O $1
+}
+
+if [ -z "$TC_SRC_DIR" ] ; then
+  TC_SRC_DIR=$NDK_TOP/toolchain-source
+fi
+
+if [ ! -d "$TC_SRC_DIR" ] ; then
+  mkdir -p $TC_SRC_DIR
+  # Later, we may want to specify --no-patches here, then download other bits that
+  #  we need, and then finally patch by hand (well, via patch-sources.sh).
+  # We'll need to do this if we need patches for the other bits we download.
+  $NDK/build/tools/download-toolchain-sources.sh $TC_SRC_DIR
+  if [ $? != 0 ]; then
+    rm -rf $TC_SRC_DIR
+    panic "download-toolchain-sources.sh failed?"
+  fi
+
+  # Other bits we need - only gmp-5.0.5 at present.
+  download http://ftp.gnu.org/gnu/gmp/gmp-5.0.5.tar.bz2
+  tar -xjf gmp-5.0.5.tar.bz2 -C $TC_SRC_DIR/gmp/
+
+  # Linaro?
+  if [ ! -z "$LINARO" ] ; then
+    download http://launchpad.net/gcc-linaro/${GCC_VER_LINARO_MAJOR}/${GCC_VER_LINARO}/+download/gcc-linaro-${GCC_VER_LINARO}.tar.bz2
+    tar xjf gcc-linaro-${GCC_VER_LINARO}.tar.bz2 -C $TC_SRC_DIR/gcc/
+    # This is so that Necessitas doesn't have to deal with 'weird' gcc-linaro-${GCC_VER_LINARO} version numbers.
+    mv $TC_SRC_DIR/gcc/gcc-linaro-${GCC_VER_LINARO} $TC_SRC_DIR/gcc/gcc-${GCC_VER_LINARO_LOCAL}
+    echo ${GCC_VER_LINARO_LOCAL} > $TC_SRC_DIR/gcc/gcc-${GCC_VER_LINARO_LOCAL}/gcc/BASE-VER
+  fi
+fi
+
+if [ ! -f $NDK/platforms/android-9/arch-arm/usr/lib/libdl.so ]; then
+  $NDK/build/tools/build-platforms.sh
+  # Get the released NDKs and mix the missing bits (libdl.so etc) into our clone of Google's NDK.
+  [ ! -f android-ndk-$NDK_VER-linux-x86.tar.bz2 ] && \
+    download http://dl.google.com/android/ndk/android-ndk-$NDK_VER-linux-x86.tar.bz2
+  [ ! -d android-ndk-$NDK_VER ]  &&        tar -xjf android-ndk-$NDK_VER-linux-x86.tar.bz2
+  mkdir -p $NDK/platforms
+  cp -rf android-ndk-$NDK_VER/platforms/* $NDK/platforms
+  # Check that (one of) the missing bits is now present (libdl.so is needed for building libstdc++)
+  if [ ! -f $NDK/platforms/android-9/arch-arm/usr/lib/libdl.so ] ; then
+    echo "Failed to find $NDK/platforms/android-9/arch-arm/usr/lib/libdl.so, bailing out"
+    exit 1
+  fi
+fi
+
+# build folder name refers to the folder (and tarball) names
+# created by build_host_gcc.
+system_name_to_build_folder_name ()
+{
+    case $1 in
+        arm)
+            echo "arm-linux-androideabi"
+        ;;
+        x86)
+            echo "x86"
+        ;;
+        mips)
+            echo "mips"
+        ;;
+    esac
+}
+
+# final folder name refers to the folder name in the NDKs released
+# by Google, and also the names passed to build-host-gcc.sh
+system_name_to_final_folder_name ()
+{
+    case $1 in
+        arm)
+            echo "arm-linux-androideabi"
+        ;;
+        x86)
+            echo "x86"
+        ;;
+        mips)
+            echo "mipsel-linux-android"
+        ;;
+    esac
+}
+
+GCC_4_6_VER=4.6
+if [ ! -z "$LINARO" ] ; then
+  GCC_4_6_VER=4.6.3
+fi
+
+GCC_VERSIONS="4.4.3 $GCC_4_6_VER"
+for TARCH in $ARCHES ; do
+  for GCC_VERSION in $GCC_VERSIONS ; do
+    ARCHES_BY_VERSIONS="$ARCHES_BY_VERSIONS "$(system_name_to_final_folder_name $TARCH)-$GCC_VERSION
+  done
+done
+
+# Building these in separate folders gives better build.log files as they're
+#  overwritten otherwise.
+GCC_BUILD_DIR=$BUILD_DIR_TMP/buildgcc
+PYTHON_BUILD_DIR=$BUILD_DIR_TMP/buildpython
+GDB_BUILD_DIR=$BUILD_DIR_TMP/buildgdb
+
+#  --build-dir=$GCC_BUILD_DIR \
+$NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
+  --gmp-version=5.0.5 \
+  --force-gold-build \
+  --default-ld=gold \
+  --systems="$SYSTEMS" \
+  --package-dir=$PWD/release-$DATESUFFIX \
+    $ARCHES_BY_VERSIONS \
+   -j$JOBS
+
+if [ "$(bh_list_contains "linux-$BUILD_ARCH" $SYSTEMS)" = "no" ] ; then
+  SYSTEMSPY=$SYSTEMS",linux-x86_64"
+fi
+
+$NDK/build/tools/build-host-python.sh \
+  --systems="$SYSTEMSPY" \
+  --build-dir=$PYTHON_BUILD_DIR \
+  --package-dir=$PWD/release-$DATESUFFIX \
+  --python-version=2.7.3 \
+   -j$JOBS
+
+$NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
+  --systems="$SYSTEMS" \
+  --build-dir=$GDB_BUILD_DIR \
+  --package-dir=$PWD/release-$DATESUFFIX \
+  --gdb-version=7.3.x \
+  --build-dir=$GDB_BUILD_DIR \
+  --arch="arm mips x86" \
+  --python-build-dir=$PYTHON_BUILD_DIR \
+  --python-version=2.7.3 \
+   -j$JOBS
+
+rm -rf /tmp/ndk-$USER/build/gdbserver*
+$NDK/build/tools/build-target-prebuilts.sh \
+  --ndk-dir=$NDK \
+  --arch="arm mips x86" \
+  --package-dir=$PWD/release-$DATESUFFIX \
+    $TC_SRC_DIR \
+  -j$JOBS
