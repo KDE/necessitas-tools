@@ -286,8 +286,8 @@ fi
 if [ ! -z "$DARWINSDK" ] ; then
   if [ ! -d "$HOST_TOOLS/darwin/apple-osx" ] ; then
     mkdir -p $HOST_TOOLS/darwin
-    download http://mingw-and-ndk.googlecode.com/files/multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120722.tar.xz
-    tar -xJf multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120531.tar.xz -C $HOST_TOOLS/darwin
+    download http://mingw-and-ndk.googlecode.com/files/multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120724.tar.xz
+    tar -xJf multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120724.tar.xz -C $HOST_TOOLS/darwin
   fi
   export PATH=$HOST_TOOLS/darwin/apple-osx/bin:$PATH
   export DARWIN_TOOLCHAIN="i686-apple-darwin11"
@@ -401,7 +401,7 @@ $NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
    -j$JOBS
 
 if [ "$(bh_list_contains "linux-$BUILD_ARCH" $SYSTEMS)" = "no" ] ; then
-  SYSTEMSPY=$SYSTEMS",linux-x86_64"
+  SYSTEMSPY=$SYSTEMS",linux-$BUILD_ARCH"
 fi
 
 $NDK/build/tools/build-host-python.sh \
