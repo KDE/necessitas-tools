@@ -262,9 +262,11 @@ fi
 # BINPREFIX is needed for building highly compatiable mingw-w64 toolchains.
 BINPREFIX=
 if [ ! "$DEBIAN_VERSION" = "6.0.5" ] ; then
-  (mkdir -p $HOST_TOOLS/linux; cd /tmp; \
-   download http://mingw-and-ndk.googlecode.com/files/i686-linux-glibc2.7-4.4.3.tar.bz2; \
-   tar -xjf i686-linux-glibc2.7-4.4.3.tar.bz2 -C $HOST_TOOLS/linux/)
+  if [ ! -d $HOST_TOOLS/linux ] ; then
+    (mkdir -p $HOST_TOOLS/linux; cd /tmp; \
+     download http://mingw-and-ndk.googlecode.com/files/i686-linux-glibc2.7-4.4.3.tar.bz2; \
+     tar -xjf i686-linux-glibc2.7-4.4.3.tar.bz2 -C $HOST_TOOLS/linux/)
+  fi
   export PATH=$HOST_TOOLS/linux/i686-linux-glibc2.7-4.4.3/bin:$PATH
   BINPREFIX=--binprefix=i686-linux
 fi
