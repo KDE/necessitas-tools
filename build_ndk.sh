@@ -263,8 +263,8 @@ fi
 BINPREFIX=
 if [ ! "$DEBIAN_VERSION" = "6.0.5" ] ; then
   (mkdir -p $HOST_TOOLS/linux; cd /tmp; \
-   download http://mingw-and-ndk.googlecode.com/files/i686-w64-mingw32-linux-i686-glibc2.7.tar.bz2; \
-   tar -xjf i686-w64-mingw32-linux-i686-glibc2.7.tar.bz2 -C $HOST_TOOLS/linux/)
+   download http://mingw-and-ndk.googlecode.com/files/i686-linux-glibc2.7-4.4.3.tar.bz2; \
+   tar -xjf i686-linux-glibc2.7-4.4.3.tar.bz2 -C $HOST_TOOLS/linux/)
   export PATH=$HOST_TOOLS/linux/i686-linux-glibc2.7-4.4.3/bin:$PATH
   BINPREFIX=--binprefix=i686-linux
 fi
