@@ -17,14 +17,15 @@ VERBOSE=1
 
 NDK_VER=r8b
 DATESUFFIX=$(date +%y%m%d)
-SYSTEMS=linux-x86,windows-x86
+#SYSTEMS=linux-x86,windows-x86
+SYSTEMS=linux-x86
 BUILD_DIR=/tmp/necessitas
 BUILD_DIR_TMP=/tmp/necessitas/ndk-tmp
 HOST_TOOLS=$BUILD_DIR/host_compiler_tools
 GCC_VER_LINARO=4.6-2012.07
 GCC_VER_LINARO_MAJOR=4.6
 GCC_VER_LINARO_LOCAL=4.6.3
-ARCHES="arm"
+ARCHES="arm,mips,x86"
 
 case $OS in
     linux)
@@ -174,22 +175,23 @@ if [ "$OS" != "linux" ]; then
     panic "Error: This script only works on Linux."
 fi
 
-SYSTEMS=$(commas_to_spaces $SYSTEMS)
+LIST_SYSTEMS=$(commas_to_spaces $SYSTEMS)
+LIST_ARCHES=$(commas_to_spaces $ARCHES)
 
 #####################
 # Darwin SDK checks #
 #####################
 
 if [ ! -z "$DARWINSDK" ] ; then
-  if [ "$(bh_list_contains "darwin-x86"    $SYSTEMS)" = "no" -a \
-       "$(bh_list_contains "darwin-x86_64" $SYSTEMS)" = "no" ] ; then
+  if [ "$(bh_list_contains "darwin-x86"    $LIST_SYSTEMS)" = "no" -a \
+       "$(bh_list_contains "darwin-x86_64" $LIST_SYSTEMS)" = "no" ] ; then
      log "You specified a --darwinsdk so"
-     log " adding darwin-x86 to the SYSTEMS list"
+     log " adding darwin-x86 to the --systems list"
      SYSTEMS="$SYSTEMS "darwin-x86
   fi
 else
-  if [ ! "$(bh_list_contains "darwin-x86"    $SYSTEMS)" = "no" -a \
-     ! ! "$(bh_list_contains "darwin-x86_64" $SYSTEMS)" = "no" ] ; then
+  if [ ! "$(bh_list_contains "darwin-x86"    $LIST_SYSTEMS)" = "no" -a \
+     ! ! "$(bh_list_contains "darwin-x86_64" $LIST_SYSTEMS)" = "no" ] ; then
      log "You included darwin in the --systems list,"
      log " but didn't provide a --darwinsdk. Assuming:"
      log "  $HOST_TOOLS/darwin/MacOSX10.7.sdk"
@@ -272,8 +274,8 @@ if [ ! "$DEBIAN_VERSION" = "6.0.5" ] ; then
 fi
 
 # Check MinGW (and possibly build the cross compiler)
-if [ ! "$(bh_list_contains "windows-x86"    $SYSTEMS)" = "no" -o \
-     ! "$(bh_list_contains "windows-x86_64" $SYSTEMS)" = "no" ] ; then
+if [ ! "$(bh_list_contains "windows-x86"    $LIST_SYSTEMS)" = "no" -o \
+     ! "$(bh_list_contains "windows-x86_64" $LIST_SYSTEMS)" = "no" ] ; then
   if [ ! -d "$HOST_TOOLS/mingw" ] ; then
     $NDK/build/tools/build-mingw64-toolchain.sh --target-arch=i686 --package-dir=i686-w64-mingw32-toolchain $BINPREFIX
     fail_panic "Couldn't build mingw-w64 toolchain"
@@ -380,7 +382,7 @@ if [ ! -z "$LINARO" ] ; then
 fi
 
 GCC_VERSIONS="4.4.3 $GCC_4_6_VER"
-for TARCH in $ARCHES ; do
+for TARCH in $LIST_ARCHES ; do
   for GCC_VERSION in $GCC_VERSIONS ; do
     ARCHES_BY_VERSIONS="$ARCHES_BY_VERSIONS "$(system_name_to_final_folder_name $TARCH)-$GCC_VERSION
   done
@@ -391,8 +393,8 @@ done
 GCC_BUILD_DIR=$BUILD_DIR_TMP/buildgcc
 PYTHON_BUILD_DIR=$BUILD_DIR_TMP/buildpython
 GDB_BUILD_DIR=$BUILD_DIR_TMP/buildgdb
+GDBSERVER_BUILD_DIR=$BUILD_DIR_TMP/buildgdb
 
-#  --build-dir=$GCC_BUILD_DIR \
 $NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
   --gmp-version=5.0.5 \
   --force-gold-build \
@@ -419,15 +421,18 @@ $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
   --package-dir=$PWD/release-$DATESUFFIX \
   --gdb-version=7.3.x \
   --build-dir=$GDB_BUILD_DIR \
-  --arch="$ARCHES" \
+  --arch=$ARCHES \
   --python-build-dir=$PYTHON_BUILD_DIR \
   --python-version=2.7.3 \
    -j$JOBS
 
 rm -rf /tmp/ndk-$USER/build/gdbserver*
+
+# For mips, this fails.
 $NDK/build/tools/build-target-prebuilts.sh \
   --ndk-dir=$NDK \
-  --arch="$ARCHES" \
+  --arch=arm,x86 \
+  --build-dir=$GDBSERVER_BUILD_DIR \
   --package-dir=$PWD/release-$DATESUFFIX \
     $TC_SRC_DIR \
   -j$JOBS
