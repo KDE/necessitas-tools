@@ -8,9 +8,13 @@ CHECKOUT_BRANCH="unstable"
 
 NECESSITAS_QT_CREATOR_VERSION="2.5.81"
 
-
-EXTERNAL_7Z=7z
-EXTERNAL_7Z_PARAMS="a -t7z -mx=9"
+if [ ! "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
+    EXTERNAL_7Z=7za
+    EXTERNAL_7Z_PARAMS="a -mx=9"
+else
+    EXTERNAL_7Z=7z
+    EXTERNAL_7Z_PARAMS="a -t7z -mx=9"
+fi
 
 # Qt Framework versions
 NECESSITAS_QT_VERSION_SHORT=482 #Necessitas Qt Framework Version
