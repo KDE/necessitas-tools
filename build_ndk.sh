@@ -17,24 +17,28 @@ VERBOSE=1
 
 NDK_VER=r8b
 DATESUFFIX=$(date +%y%m%d)
-#SYSTEMS=linux-x86,windows-x86
-SYSTEMS=linux-x86
-BUILD_DIR=/tmp/necessitas
-BUILD_DIR_TMP=/tmp/necessitas/ndk-tmp
+BUILD_DIR=$HOME/necessitas-tmp
+BUILD_DIR_TMP=$BUILD_DIR/ndk-tmp
 HOST_TOOLS=$BUILD_DIR/host_compiler_tools
 GCC_VER_LINARO=4.6-2012.07
 GCC_VER_LINARO_MAJOR=4.6
 GCC_VER_LINARO_LOCAL=4.6.3
-ARCHES="arm,mips,x86"
+# ARCHES="arm,mips,x86"
+ARCHES="arm"
+OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 
-case $OS in
-    linux)
+case $OSTYPE_MAJOR in
+    linux*)
+        SYSTEMS=linux-x86,windows-x86
         NUM_CORES=$(grep -c -e '^processor' /proc/cpuinfo)
         ;;
     darwin|freebsd)
+#       SYSTEMS=darwin-x86,windows-x86
+        SYSTEMS=darwin-x86
         NUM_CORES=`sysctl -n hw.ncpu`
         ;;
     windows|cygwin)
+        SYSTEMS=darwin-x86,windows-x86
         NUM_CORES=$NUMBER_OF_PROCESSORS
         ;;
     *)
@@ -197,10 +201,6 @@ case $BUILD_ARCH in
     amd64) BUILD_ARCH=x86_64;;
 esac
 
-if [ "$OS" != "linux" ]; then
-    panic "Error: This script only works on Linux."
-fi
-
 LIST_SYSTEMS=$(commas_to_spaces $SYSTEMS)
 LIST_ARCHES=$(commas_to_spaces $ARCHES)
 
@@ -264,9 +264,9 @@ NDK_TOP="$BUILD_DIR"/android-qt-ndk
 mkdir -p "$NDK_TOP"
 NDK=$NDK_TOP/ndk
 mkdir -p $(dirname "$NDK")
-NDK_PLATFORM=$BUILD_DIR/ndk_meta
 if [ ! -d $NDK ] ; then
   git clone http://anongit.kde.org/android-qt-ndk.git $NDK
+  (cd $NDK; git checkout -b ndk-r8b-fixes -t origin/ndk-r8b-fixes)
   fail_panic "Couldn't clone android-qt-ndk"
 fi
 
