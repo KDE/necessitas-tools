@@ -375,7 +375,7 @@ function prepareNecessitasQtCreator
         fi
         rm -fr $QTC_INST_PATH
         export INSTALL_ROOT=$QTC_INST_PATH
-        make install
+        make docs install
 
 #         #download and install sdk-updater-plugin
 #         export QTC_SOURCE=$PWD
@@ -1644,7 +1644,7 @@ function prepareSDKBinary
 function prepareSDKRepository
 {
     rm -fr $REPO_PATH
-    $SDK_TOOLS_PATH/repogen -v  -p $REPO_PATH_PACKAGES -c $REPO_SRC_PATH/config $REPO_PATH org.kde.necessitas
+    $SDK_TOOLS_PATH/repogen -v  -p $REPO_PATH_PACKAGES -c $REPO_SRC_PATH/config -u http://files.kde.org/necessitas/test $REPO_PATH
 }
 
 function prepareMinistroRepository
