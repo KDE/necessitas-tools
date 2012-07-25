@@ -147,6 +147,32 @@ bh_list_contains ()
   return 1
 }
 
+# $1 is the string to remove (all instances of)
+# $2... is the list to search in
+# Prints new list
+bh_list_remove ()
+{
+  local SEARCH="$1"
+  shift
+  # For dash, this has to be split over 2 lines.
+  # Seems to be a bug with dash itself:
+  # https://bugs.launchpad.net/ubuntu/+source/dash/+bug/141481
+  local LIST
+  LIST=$@
+  local RESULT
+  # Pull out the host if there
+  RETCODE=1
+  for ELEMENT in $LIST; do
+    if [ ! "$ELEMENT" = "$SEARCH" ]; then
+      RESULT=$RESULT" $ELEMENT"
+    else
+      RETCODE=0
+    fi
+  done
+  echo $RESULT
+  return $RETCODE
+}
+
 ###################
 # Build OS checks #
 ###################
@@ -390,7 +416,6 @@ done
 
 # Building these in separate folders gives better build.log files as they're
 #  overwritten otherwise.
-GCC_BUILD_DIR=$BUILD_DIR_TMP/buildgcc
 PYTHON_BUILD_DIR=$BUILD_DIR_TMP/buildpython
 GDB_BUILD_DIR=$BUILD_DIR_TMP/buildgdb
 GDBSERVER_BUILD_DIR=$BUILD_DIR_TMP/buildgdb
@@ -428,10 +453,18 @@ $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
 
 rm -rf /tmp/ndk-$USER/build/gdbserver*
 
-# For mips, this fails.
+# CAN'T CURRENTLY BUILD MIPS LIBS OR GDBSERVER!
+ARCHES_WITHOUT_MIPS=$(bh_list_remove mips $LIST_ARCHES)
+if [ "$LIST_ARCHES" != "$ARCHES_WITHOUT_MIPS" ]; then
+    echo "WARNING :: Removed mips from build-target-prebuilts.sh"
+    echo "        :: to avoid error:"
+    echo "        ::  collect2: cannot find 'ld'"
+fi
+ARCHES_WITHOUT_MIPS=$(spaces_to_commas $ARCHES_WITHOUT_MIPS)
+
 $NDK/build/tools/build-target-prebuilts.sh \
   --ndk-dir=$NDK \
-  --arch=arm,x86 \
+  --arch="$ARCHES_WITHOUT_MIPS" \
   --build-dir=$GDBSERVER_BUILD_DIR \
   --package-dir=$PWD/release-$DATESUFFIX \
     $TC_SRC_DIR \
