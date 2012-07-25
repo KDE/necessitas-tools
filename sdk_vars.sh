@@ -6,7 +6,7 @@ HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
 
 CHECKOUT_BRANCH="unstable"
 
-NECESSITAS_QT_CREATOR_VERSION="2.3.1.2"
+NECESSITAS_QT_CREATOR_VERSION="2.5.81"
 
 if [ ! "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     EXTERNAL_7Z=7za

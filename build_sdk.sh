@@ -657,9 +657,10 @@ function prepareNDKs
         fi
     fi
     mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
+    export ANDROID_NDK_ROOT=$PWD/android-ndk
 
-    ANDROID_STRIP_BINARY=$ANDROID_NDK_ROOT/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$HOST_TAG_NDK/bin/arm-linux-androideabi-strip$EXE_EXT
-    ANDROID_READELF_BINARY=$ANDROID_NDK_ROOT/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$HOST_TAG_NDK/bin/arm-linux-androideabi-readelf$EXE_EXT
+    ANDROID_STRIP_BINARY=$ANDROID_NDK_ROOT/toolchains/arm-linux-androideabi-4.6/prebuilt/$HOST_TAG_NDK/bin/arm-linux-androideabi-strip$EXE_EXT
+    ANDROID_READELF_BINARY=$ANDROID_NDK_ROOT/toolchains/arm-linux-androideabi-4.6/prebuilt/$HOST_TAG_NDK/bin/arm-linux-androideabi-readelf$EXE_EXT
 }
 
 function prepareGDB
@@ -1117,11 +1118,11 @@ function packSource
     rm -fr $TEMP_PATH/source_temp_path
     mkdir -p $TEMP_PATH/source_temp_path/Android/Qt/$NECESSITAS_QT_VERSION_SHORT
     mv $1/.git .
-    if [ $1 = "qt-src" ]
-    then
-        mv $1/src/3rdparty/webkit .
-        mv $1/tests .
-    fi
+#    if [ $1 = "qt-src" ]
+#    then
+#        mv $1/src/3rdparty/webkit .
+#        mv $1/tests .
+#    fi
 
     if [ $1 = "qtwebkit-src" ]
     then
@@ -1136,11 +1137,11 @@ function packSource
     popd
     #mv $TEMP_PATH/source_temp_path/Android/Qt/$NECESSITAS_QT_VERSION_SHORT/$1 .
     mv .git $1/
-    if [ $1 = "qt-src" ]
-    then
-        mv webkit $1/src/3rdparty/
-        mv tests $1/
-    fi
+#    if [ $1 = "qt-src" ]
+#    then
+#        mv webkit $1/src/3rdparty/
+#        mv tests $1/
+#    fi
     if [ $1 = "qtwebkit-src" ]
     then
         mv LayoutTests $1/
@@ -1791,9 +1792,9 @@ prepareNecessitasQt
 # Webkit is broken currently.
 # prepareNecessitasQtWebkit
 
-#if [ "$OSTYPE_MAJOR" != "msys" ] ; then
-#    prepareNecessitasQtMobility # if [[ `gcc --version` =~ .*llvm.* ]]; => syntax error near `=~'
-#fi
+if [ "$OSTYPE_MAJOR" != "msys" ] ; then
+    prepareNecessitasQtMobility # if [[ `gcc --version` =~ .*llvm.* ]]; => syntax error near `=~'
+fi
 
 popd
 

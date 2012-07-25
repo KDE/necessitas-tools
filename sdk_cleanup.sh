@@ -1,7 +1,12 @@
 # remove things which are not ready for release
 function preparePackages
 {
-    mv $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.official $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}
+    if [ ! -d $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION} ]
+    then
+        mv $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.official $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.${ANDROID_NDK_VERSION}
+    else
+       rm -fr $TEMP_PATH/out/necessitas/sdk_src/org.kde.necessitas.misc.ndk.official
+    fi
 }
 
 function removeUnusedPackages
