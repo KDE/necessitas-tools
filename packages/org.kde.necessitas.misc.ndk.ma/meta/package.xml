@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<Package>
+    <DisplayName>Android NDK-@@ANDROID_NDK_VERSION@@ Necessitas Special</DisplayName>
+    <Description>Android NDK-@@ANDROID_NDK_VERSION@@ Necessitas Special</Description>
+    <Version>@@ANDROID_NDK_VERSION@@</Version>
+    <ReleaseDate>@@TODAY@@</ReleaseDate>
+    <Name>org.kde.necessitas.misc.ndk.ma</Name>
+    <Script>installscript.qs</Script>
+    <Dependencies>org.kde.necessitas.tools.qtcreator</Dependencies>
+    <Default>true</Default>
+    <InstallPriority>0</InstallPriority>
+    <SortingPriority>0</SortingPriority>
+</Package>
