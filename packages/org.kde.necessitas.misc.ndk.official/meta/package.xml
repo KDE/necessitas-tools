@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <Package>
-    <DisplayName>Android NDK-@@ANDROID_NDK_VERSION@@</DisplayName>
-    <Description>Android NDK-@@ANDROID_NDK_VERSION@@</Description>
+    <DisplayName>Android NDK-@@ANDROID_NDK_VERSION@@ Official</DisplayName>
+    <Description>Android NDK-@@ANDROID_NDK_VERSION@@ (Warning:: Restricted debugging capabilities)
+</Description>
     <Version>@@ANDROID_NDK_VERSION@@</Version>
     <ReleaseDate>@@TODAY@@</ReleaseDate>
     <Name>org.kde.necessitas.misc.ndk.@@ANDROID_NDK_VERSION@@</Name>
