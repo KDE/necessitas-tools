@@ -385,7 +385,7 @@ function prepareNecessitasQtCreator
             # Mac doesn't use INSTALL_ROOT (except docs/translations where it'd be incorrect)
             mkdir -p $INSTALL_ROOT/bin
             export INSTALL_ROOT="$QTC_INST_PATH"
-#            make docs && PATH=$SHARED_QT_PATH/bin:$PATH make deployqt
+            make docs && PATH=$SHARED_QT_PATH/bin:$PATH make deployqt
         else
             export INSTALL_ROOT=$QTC_INST_PATH
             make docs install
