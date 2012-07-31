@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <Package>
     <DisplayName>API 15</DisplayName>
-    <Description>Android SDK API 15 (@@ANDROID_API_15_VERSION@@)</Description>
+    <Description>Android 4.0.3, 4.0.4 Ice Cream Sandwich SDK API 15 (@@ANDROID_API_15_VERSION@@)</Description>
     <Version>@@ANDROID_API_15_VERSION@@</Version>
     <ReleaseDate>@@TODAY@@</ReleaseDate>
     <Name>org.kde.necessitas.misc.sdk.android_15</Name>

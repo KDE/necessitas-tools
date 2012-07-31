@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <Package>
     <DisplayName>API 13</DisplayName>
-    <Description>Android SDK API 13 (@@ANDROID_API_13_VERSION@@)</Description>
+    <Description>Android 3.2 Honeycomb_MR2 SDK API 13 (@@ANDROID_API_13_VERSION@@)</Description>
     <Version>@@ANDROID_API_13_VERSION@@</Version>
     <ReleaseDate>@@TODAY@@</ReleaseDate>
     <Name>org.kde.necessitas.misc.sdk.android_13</Name>

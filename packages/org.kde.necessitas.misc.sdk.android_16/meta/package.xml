@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <Package>
     <DisplayName>API 16</DisplayName>
-    <Description>Android SDK API 16 (@@ANDROID_API_16_VERSION@@)</Description>
+    <Description>Android 4.1, 4.1.1 Jelly Bean SDK API 16 (@@ANDROID_API_16_VERSION@@)</Description>
     <Version>@@ANDROID_API_16_VERSION@@</Version>
     <ReleaseDate>@@TODAY@@</ReleaseDate>
     <Name>org.kde.necessitas.misc.sdk.android_16</Name>
