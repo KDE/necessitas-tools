@@ -280,15 +280,22 @@ function prepareHostQt
         HOST_QT_CFG="CONFIG+=release QT+=network"
     fi
 
+#    if [ "$OSTYPE_MAJOR" = "msys" ] ; then
+#        STATIC_PREFIX="st-b"
+#        SHARED_PREFIX="sh-b"
+#    else
+        STATIC_PREFIX="static-build"
+        SHARED_PREFIX="shared-build"
+#    fi
 
     # Even on Linux, static Qt 4.8 doesn't build!
-    mkdir static-build$HOST_QT_CONFIG
-    pushd static-build$HOST_QT_CONFIG
+    mkdir ${STATIC_PREFIX}${HOST_QT_CONFIG}
+    pushd ${STATIC_PREFIX}${HOST_QT_CONFIG}
     STATIC_QT_PATH=$PWD
     if [ ! -f all_done ]
     then
         pushd $QT_SRCDIR
-        git checkout $HOST_QT_BRANCH
+        git checkout -b $(basename $HOST_QT_BRANCH) $HOST_QT_BRANCH
         git pull
         popd
         rm -fr *
@@ -304,8 +311,8 @@ function prepareHostQt
     popd
 
     #build qt shared, needed by QtCreator
-    mkdir shared-build$HOST_QT_CONFIG
-    pushd shared-build$HOST_QT_CONFIG
+    mkdir ${SHARED_PREFIX}${HOST_QT_CONFIG}
+    pushd ${SHARED_PREFIX}${HOST_QT_CONFIG}
     SHARED_QT_PATH=$PWD
     if [ ! -f all_done ]
     then
@@ -439,25 +446,34 @@ function prepareNecessitasQtCreator
 # A few things are downloaded as binaries.
 function makeInstallMinGWLibsAndTools
 {
+    # Calculate the gcc install prefix from the install location of mingw gcc... horrible.
+    MINGW_PREFIX=$(gcc --print-search-dirs | head -1 | cut -d' ' -f 2)
+    MINGW_PREFIX=$(echo $MINGW_PREFIX | sed 's/\\/\//g')
+    MINGW_PREFIX=$(cd $MINGW_PREFIX; echo $PWD)
+    MINGW_PREFIX=$(dirname $MINGW_PREFIX)
+    MINGW_TOPLEV=$(basename $MINGW_PREFIX)
+    MINGW_PREFIX=$(dirname $(dirname $(dirname $MINGW_PREFIX)))
+    MINGW_PREFIX=$MINGW_PREFIX/$MINGW_TOPLEV
+
     if [ -d mingw-bits ] ; then
         return
     fi
 
-    mkdir -p /usr/local/bin
-    mkdir -p /usr/local/share
+    mkdir -p ${MINGW_PREFIX}/bin
+    mkdir -p ${MINGW_PREFIX}/share
 
     mkdir mingw-bits
     pushd mingw-bits
 
-    mkdir texinfo
-    pushd texinfo
-    downloadIfNotExists texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma http://heanet.dl.sourceforge.net/project/mingw/MSYS/texinfo/texinfo-4.13a-2/texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma
-    rm -rf texinfo-4.13a-2-msys-1.0.13-bin.tar
-    $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS  texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma
-    tar -xvf texinfo-4.13a-2-msys-1.0.13-bin.tar
-    mv bin/* /usr/local/bin
-    mv share/* /usr/local/share
-    popd
+#    mkdir texinfo
+#    pushd texinfo
+#    downloadIfNotExists texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma http://heanet.dl.sourceforge.net/project/mingw/MSYS/texinfo/texinfo-4.13a-2/texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma
+#    rm -rf texinfo-4.13a-2-msys-1.0.13-bin.tar
+#    7za x texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma
+#    tar -xvf texinfo-4.13a-2-msys-1.0.13-bin.tar
+#    mv bin/* /usr/local/bin
+#    mv share/* /usr/local/share
+#    popd
 
     # pdcurses must be in /usr for gdb configure to work (though I'd prefer if mingw gcc would look in /usr/local too!)
     downloadIfNotExists PDCurses-3.4.tar.gz http://downloads.sourceforge.net/pdcurses/pdcurses/3.4/PDCurses-3.4.tar.gz
@@ -466,25 +482,26 @@ function makeInstallMinGWLibsAndTools
     pushd PDCurses-3.4/win32
     sed '90s/-copy/-cp/' mingwin32.mak > mingwin32-fixed.mak
     make -f mingwin32-fixed.mak WIDE=Y UTF8=Y DLL=N
-    cp pdcurses.a /usr/lib/libcurses.a
-    cp pdcurses.a /usr/lib/libncurses.a
-    cp pdcurses.a /usr/lib/libpdcurses.a
-    cp panel.a /usr/lib/libpanel.a
-    cp ../curses.h /usr/include
-    cp ../panel.h /usr/include
+    cp pdcurses.a ${MINGW_PREFIX}/lib/libcurses.a
+    cp pdcurses.a ${MINGW_PREFIX}/lib/libncurses.a
+    cp pdcurses.a ${MINGW_PREFIX}/lib/libpdcurses.a
+    cp panel.a ${MINGW_PREFIX}/lib/libpanel.a
+    cp ../curses.h ${MINGW_PREFIX}/include
+    cp ../panel.h ${MINGW_PREFIX}/include
     popd
 
     # download, compile & install zlib to /usr
-    downloadIfNotExists zlib-1.2.5.tar.gz http://downloads.sourceforge.net/libpng/zlib/1.2.5/zlib-1.2.5.tar.gz
-    if [ ! -f /usr/lib/libz.a ] ; then
-        tar -xvzf zlib-1.2.5.tar.gz
-        pushd zlib-1.2.5
-        doSed $"s#usr/#local/usr#" win32/Makefile.gcc
+    downloadIfNotExists zlib-1.2.7.tar.gz http://downloads.sourceforge.net/libpng/zlib/1.2.7/zlib-1.2.7.tar.gz
+    if [ ! -f ${MINGW_PREFIX}/lib/libz.a ] ; then
+        tar -xvzf zlib-1.2.7.tar.gz
+        pushd zlib-1.2.7
+        doSed $"s#/usr/local#${MINGW_PREFIX}#" win32/Makefile.gcc
         make -f win32/Makefile.gcc
-        export INCLUDE_PATH=/usr/include
-        export LIBRARY_PATH=/usr/lib
+        export INCLUDE_PATH=${MINGW_PREFIX}/include
+        export LIBRARY_PATH=${MINGW_PREFIX}/lib
+        export BINARY_PATH=${MINGW_PREFIX}/bin
         make -f win32/Makefile.gcc install
-        rm -rf zlib-1.2.5
+        rm -rf zlib-1.2.7
         popd
     fi
 
@@ -493,6 +510,17 @@ function makeInstallMinGWLibsAndTools
     # which fixes the longstanding make.exe -jN process hang, allowing un-attended builds of all Qt things.
     downloadIfNotExists make.exe http://mingw-and-ndk.googlecode.com/files/make.exe
     mv make.exe /usr/local/bin/ma-make.exe
+
+    downloadIfNotExists libiconv-1.14.tar.gz http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
+    rm -rf libiconv-1.14
+    tar -xvzf libiconv-1.14.tar.gz
+    pushd libiconv-1.14
+    CFLAGS=-O2 && ./configure --enable-static --disable-shared --with-curses=$install_dir --enable-multibyte --prefix=${MINGW_PREFIX}  CFLAGS=-O3
+    make
+    # Without the /mingw folder, this fails, but only after copying libiconv.a to the right place.
+    make install
+    cp include/iconv.h ${MINGW_PREFIX}/include
+    popd
 
     popd
 }

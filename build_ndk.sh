@@ -27,6 +27,23 @@ GCC_VER_LINARO_LOCAL=4.6.3
 ARCHES="arm"
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 
+# We need a newer MSYS expr.exe and we need it early in this process.
+# I made one from coreutils-8.17.
+# If you used BootstrapMinGW64.vbs to create your mingw-w64
+#  environment then that will have copied this expr into the bin folder
+#  already, but in-case you didn't...
+if [ "$OSTYPE" = "msys" ] ; then
+  echo "Testing expr.exe"
+  EXPR_RESULT=`expr -- "--test=<value>" : '--[^=]*=\(<.*>\)' 2>&1 > /dev/null`
+  if [ ! "$EXPR_RESULT" = "<value>" ] ; then
+    echo "Downloading more modern MSYS expr"
+    if [ ! -f $PWD/expr.exe ] ; then
+      curl -S -L -O http://mingw-and-ndk.googlecode.com/files/expr.exe
+    fi
+    export PATH=$PWD:$PATH
+  fi
+fi
+
 case $OSTYPE_MAJOR in
     linux*)
         SYSTEMS=linux-x86,windows-x86
@@ -37,7 +54,8 @@ case $OSTYPE_MAJOR in
         SYSTEMS=darwin-x86
         NUM_CORES=`sysctl -n hw.ncpu`
         ;;
-    windows|cygwin)
+    windows|msys|cygwin)
+        export PATH=$BUILD_DIR/bin:$PATH
         SYSTEMS=darwin-x86,windows-x86
         NUM_CORES=$NUMBER_OF_PROCESSORS
         ;;
@@ -188,7 +206,7 @@ case $OS in
     Linux) OS=linux;;
     Darwin) OS=darwin;;
     CYGWIN*|*_NT-*) OS=windows;
-        if [ "$OSTYPE" = cygwgin ]; then
+        if [ "$OSTYPE" = cygwin ]; then
             OS=cygwin
         fi
         EXEEXT=.exe
@@ -256,6 +274,53 @@ if [ "$HELP" ] ; then
     exit 0
 fi
 
+###########################
+# Make some Windows tools #
+###########################
+
+build_windows_programs ()
+{
+  local BUILDDIR=$1
+  local PREFIX=$2
+  local PATCHES=$3
+
+  if [ "$OSTYPE" = "msys" ] ; then
+    if [ -z $(which file) ] ; then
+    (cd $BUILDDIR;
+      if ! $(curl -S -L -O http://kent.dl.sourceforge.net/project/mingw/Other/UserContributed/regex/mingw-regex-2.5.1/mingw-libgnurx-2.5.1-src.tar.gz); then
+        error "Failed to get and extract mingw-regex-2.5.1 Check errors."
+      fi
+      tar -xf mingw-libgnurx-2.5.1-src.tar.gz
+      pushd mingw-libgnurx-2.5.1
+      patch --backup -p0 < ${PATCHES}/mingw-libgnurx-2.5.1-static.patch
+      ./configure --prefix=$PREFIX --enable-static --disable-shared
+      if ! make  -j$JOBS; then
+        error "Failed to make mingw-libgnurx-2.5.1"
+        popd
+        exit 1
+      fi
+      make -j$JOBS install
+      popd
+
+      curl -S -L -O ftp://ftp.astron.com/pub/file/file-5.11.tar.gz
+      tar -xvf file-5.11.tar.gz
+      (cd file-5.11
+       CFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" ./configure --prefix=$PREFIX
+       make -j$JOBS
+       make install
+      )
+      if [ ! $? = 0 ]; then
+        echo "Failed to build file"
+        exit 1
+      fi
+     )
+    fi
+  fi
+}
+
+export PATH=$BUILD_DIR/bin:$PATH
+build_windows_programs "$BUILD_DIR_TMP" "$BUILD_DIR" "$PWD/misc-patches"
+
 ###########################################
 # Clone the android-qt-ndk git repository #
 ###########################################
@@ -282,21 +347,23 @@ fi
 # Debian env.
 # Otherwise, we use it, assuming that Linux is the only OS worth doing
 # this kind of cross compilation task on (IMHO, it is).
-DEBIAN_VERSION=
-if [ -f /etc/debian_version ] ; then
-  DEBIAN_VERSION=$(head -n 1 /etc/debian_version)
-fi
-
-# BINPREFIX is needed for building highly compatiable mingw-w64 toolchains.
-BINPREFIX=
-if [ ! "$DEBIAN_VERSION" = "6.0.5" ] ; then
-  if [ ! -d $HOST_TOOLS/linux ] ; then
-    (mkdir -p $HOST_TOOLS/linux; cd /tmp; \
-     download http://mingw-and-ndk.googlecode.com/files/i686-linux-glibc2.7-4.4.3.tar.bz2; \
-     tar -xjf i686-linux-glibc2.7-4.4.3.tar.bz2 -C $HOST_TOOLS/linux/)
+if [ "$OSTYPE" = "linux-gnu" ] ; then
+  DEBIAN_VERSION=
+  if [ -f /etc/debian_version ] ; then
+    DEBIAN_VERSION=$(head -n 1 /etc/debian_version)
   fi
-  export PATH=$HOST_TOOLS/linux/i686-linux-glibc2.7-4.4.3/bin:$PATH
-  BINPREFIX=--binprefix=i686-linux
+
+  # BINPREFIX is needed for building highly compatiable mingw-w64 toolchains.
+  BINPREFIX=
+  if [ ! "$DEBIAN_VERSION" = "6.0.5" -a ] ; then
+    if [ ! -d $HOST_TOOLS/linux ] ; then
+      (mkdir -p $HOST_TOOLS/linux; cd /tmp; \
+       download http://mingw-and-ndk.googlecode.com/files/i686-linux-glibc2.7-4.4.3.tar.bz2; \
+       tar -xjf i686-linux-glibc2.7-4.4.3.tar.bz2 -C $HOST_TOOLS/linux/)
+    fi
+    export PATH=$HOST_TOOLS/linux/i686-linux-glibc2.7-4.4.3/bin:$PATH
+    BINPREFIX=--binprefix=i686-linux
+  fi
 fi
 
 # Check MinGW (and possibly build the cross compiler)
@@ -316,8 +383,16 @@ fi
 if [ ! -z "$DARWINSDK" ] ; then
   if [ ! -d "$HOST_TOOLS/darwin/apple-osx" ] ; then
     mkdir -p $HOST_TOOLS/darwin
-    download http://mingw-and-ndk.googlecode.com/files/multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120724.tar.xz
-    tar -xJf multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120724.tar.xz -C $HOST_TOOLS/darwin
+    if [ $OSTYPE_MAJOR = "linux-gnu" ] ; then
+        download http://mingw-and-ndk.googlecode.com/files/multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120724.tar.xz
+        tar -xJf multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Linux-120724.tar.xz -C $HOST_TOOLS/darwin
+    elif [ $OSTYPE_MAJOR = "windows" ] ; then
+        download http://mingw-and-ndk.googlecode.com/files/multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Windows-120614.7z
+        7za x multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Windows-120614.7z -o$HOST_TOOLS/darwin
+    else
+        download http://mingw-and-ndk.googlecode.com/files/multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Darwin-120615.7z
+        7za x multiarch-darwin11-cctools127.2-gcc42-5666.3-llvmgcc42-2336.1-Darwin-120615.7z -o$HOST_TOOLS/darwin
+    fi
   fi
   export PATH=$HOST_TOOLS/darwin/apple-osx/bin:$PATH
   export DARWIN_TOOLCHAIN="i686-apple-darwin11"
