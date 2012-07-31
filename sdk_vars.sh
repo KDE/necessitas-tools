@@ -2,7 +2,13 @@ MINISTRO_VERSION="0.4" #Ministro repo version
 
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 
-HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
+if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
+    HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
+elif [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+    HOST_QT_BRANCH="refs/remotes/origin/ports"
+else
+    HOST_QT_BRANCH="refs/remotes/origin/4.8"
+fi
 
 CHECKOUT_BRANCH="unstable"
 
@@ -10,10 +16,12 @@ NECESSITAS_QT_CREATOR_VERSION="2.5.81"
 
 if [ ! "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     EXTERNAL_7Z=7za
-    EXTERNAL_7Z_PARAMS="a -mx=9"
+    EXTERNAL_7Z_A_PARAMS="a -mx=9"
+    EXTERNAL_7Z_X_PARAMS="x"
 else
     EXTERNAL_7Z=7z
-    EXTERNAL_7Z_PARAMS="a -t7z -mx=9"
+    EXTERNAL_7Z_A_PARAMS="a -t7z -mx=9"
+    EXTERNAL_7Z_X_PARAMS="-y x"
 fi
 
 # Qt Framework versions

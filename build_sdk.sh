@@ -104,7 +104,7 @@ if [ "$OSTYPE" = "msys" ] ; then
     JOBS=`expr $NUMBER_OF_PROCESSORS + 2`
 else
     if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
-        HOST_CFG_OPTIONS=" -platform macx-g++42 -sdk /Developer/SDKs/MacOSX10.5.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
+        HOST_CFG_OPTIONS=" -platform macx-g++ -sdk /Developer/SDKs/MacOSX10.6.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
         HOST_QM_CFG_OPTIONS="CONFIG+=x86 CONFIG+=x86_64"
         # -reduce-exports doesn't work for static Mac OS X i386 build.
         # (ld: bad codegen, pointer diff in fulltextsearch::clucene::QHelpSearchIndexReaderClucene::run()     to global weak symbol vtable for QtSharedPointer::ExternalRefCountDatafor architecture i386)
@@ -115,7 +115,8 @@ else
         JOBS=`sysctl -n hw.ncpu`
         JOBS=`expr $JOBS + 2`
     else
-        HOST_CFG_OPTIONS=" -platform linux-g++-64 -arch x86_64"
+        HOST_CFG_OPTIONS=" -platform linux-g++ -arch i386"
+#        HOST_CFG_OPTIONS=" -platform linux-g++-64 -arch x86_64"
         HOST_TAG=linux-x86
         HOST_TAG_NDK=linux-x86
         SHLIB_EXT=.so
@@ -139,9 +140,9 @@ function createArchive # params $1 folder, $2 archive name, $3 extra params
         then
             EXTRA_PARAMS="-l"
         fi
-        $EXTERNAL_7Z $EXTERNAL_7Z_PARAMS -mmt=$JOBS $EXTRA_PARAMS $3 $2 $1 || error_msg "Can't create archive $EXTERNAL_7Z $EXTERNAL_7Z_PARAMS -mmt=$JOBS $2 $1"
+        $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS -mmt=$JOBS $EXTRA_PARAMS $3 $2 "$1" || error_msg "Can't create archive $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS -mmt=$JOBS $2 $1"
     else
-        $SDK_TOOLS_PATH/archivegen $1 $2
+        $SDK_TOOLS_PATH/archivegen "$1" $2
     fi
 }
 
@@ -364,7 +365,14 @@ function prepareNecessitasQtCreator
     if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.tools.qtcreator/data/qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z ]
     then
         pushd $QTC_PATH
-        QTC_INST_PATH=$PWD/QtCreator$HOST_QT_CONFIG
+        if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+            # This is only used for make docs on Mac.
+            QTC_INST_DIRNAME=Qt\ Creator.app
+            QTC_INST_PATH="$PWD/bin/$QTC_INST_DIRNAME"
+        else
+            QTC_INST_DIRNAME=QtCreator$HOST_QT_CONFIG
+            QTC_INST_PATH=$PWD/$QTC_INST_DIRNAME
+        fi
         if [ ! -f all_done ] ; then
             git checkout unstable
             git pull
@@ -373,25 +381,16 @@ function prepareNecessitasQtCreator
             $SHARED_QT_PATH/bin/qmake $HOST_QT_CFG $HOST_QM_CFG_OPTIONS -r || error_msg "Can't configure android-qt-creator"
             doMake "Can't compile $QTC_PATH" "all done" ma-make
         fi
-        rm -fr $QTC_INST_PATH
-        export INSTALL_ROOT=$QTC_INST_PATH
-        make docs install
+        if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+            # Mac doesn't use INSTALL_ROOT (except docs/translations where it'd be incorrect)
+            mkdir -p $INSTALL_ROOT/bin
+            export INSTALL_ROOT="$QTC_INST_PATH"
+#            make docs && PATH=$SHARED_QT_PATH/bin:$PATH make deployqt
+        else
+            export INSTALL_ROOT=$QTC_INST_PATH
+            make docs install
+        fi
 
-#         #download and install sdk-updater-plugin
-#         export QTC_SOURCE=$PWD
-#         downloadIfNotExists research-sdk-updater-plugin-master-snapshot-20110524185306-updated.tar.gz http://android-lighthouse.googlecode.com/files/research-sdk-updater-plugin-master-snapshot-20110524185306-updated.tar.gz
-#         if [ ! -d research-sdk-updater-plugin-master-snapshot-20110524185306 ]
-#         then
-#             tar xvfz research-sdk-updater-plugin-master-snapshot-20110524185306-updated.tar.gz
-#         fi
-#         pushd research-sdk-updater-plugin-master-snapshot-20110524185306
-#             $SHARED_QT_PATH/bin/qmake $HOST_QT_CFG $HOST_QM_CFG_OPTIONS -r || error_msg "Can't configure sdk-updater-plugin"
-#             doMake "Can't compile sdk-updater-plugin" "all done" ma-make
-#             make install
-#         popd
-
-        mkdir -p $QTC_INST_PATH/Qt/imports
-        mkdir -p $QTC_INST_PATH/Qt/plugins
         if [ "$OSTYPE" = "msys" ]; then
             mkdir -p $QTC_INST_PATH/bin
             cp -rf lib/qtcreator/* $QTC_INST_PATH/bin/
@@ -408,63 +407,33 @@ function prepareNecessitasQtCreator
 #            popd
 #            cp android-various/make-3.82-build/make.exe $QTC_INST_PATH/bin/
             cp /usr/local/bin/ma-make.exe $QTC_INST_PATH/bin/make.exe
-        else
-            if [ "$OSTYPE" = "linux-gnu" ]; then
-                mkdir -p $QTC_INST_PATH/Qt/lib
-                QT_LIB_DEST=$QTC_INST_PATH/Qt/lib/
-                cp -a $SHARED_QT_PATH/lib/* $QT_LIB_DEST
-                rm -fr $QT_LIB_DEST/pkgconfig
-                find . $QT_LIB_DEST -name *.la | xargs rm -fr
-                find . $QT_LIB_DEST -name *.prl | xargs rm -fr
-                cp -a $SHARED_QT_PATH/imports/* ${QT_LIB_DEST}../imports
-                cp -a $SHARED_QT_PATH/plugins/* ${QT_LIB_DEST}../plugins
-                cp -a bin/necessitas $QTC_INST_PATH/bin/
-            else
-                pushd macdeployqt
-                $SHARED_QT_PATH/bin/qmake $HOST_QT_CFG $HOST_QM_CFG_OPTIONS -r || error_msg "Can't configure macdeployqt"
-                doMake "Can't compile macdeployqt" "all done" ma-make
-                popd
-                pushd bin
-                rm -rf NecessitasQtCreatorBackup.app
-                cp -rf NecessitasQtCreator.app NecessitasQtCreatorBackup.app
-                ../macdeployqt/macdeployqt/macdeployqt NecessitasQtCreator.app
-                popd
-                mv bin/NecessitasQtCreator.app $QTC_INST_PATH/bin/NecessitasQtCreator.app
-                mv bin/NecessitasQtCreatorBackup.app bin/NecessitasQtCreator.app
-            fi
+        elif [ "$OSTYPE" = "linux-gnu" ]; then
+            mkdir -p $QTC_INST_PATH/Qt/imports
+            mkdir -p $QTC_INST_PATH/Qt/plugins
+            mkdir -p $QTC_INST_PATH/Qt/lib
+            QT_LIB_DEST=$QTC_INST_PATH/Qt/lib/
+            cp -a $SHARED_QT_PATH/lib/* $QT_LIB_DEST
+            rm -fr $QT_LIB_DEST/pkgconfig
+            find . $QT_LIB_DEST -name *.la | xargs rm -fr
+            find . $QT_LIB_DEST -name *.prl | xargs rm -fr
+            cp -a $SHARED_QT_PATH/imports/* ${QT_LIB_DEST}../imports
+            cp -a $SHARED_QT_PATH/plugins/* ${QT_LIB_DEST}../plugins
+            cp -a bin/necessitas $QTC_INST_PATH/bin/
         fi
-        mkdir $QTC_INST_PATH/images
-        cp -a bin/necessitas*.png $QTC_INST_PATH/images/
-        pushd $QTC_INST_PATH
+        mkdir "$QTC_INST_PATH/images"
+        cp -a bin/necessitas*.png "$QTC_INST_PATH/images/"
+        pushd "$QTC_INST_PATH"
         if [ -z $HOST_QT_CONFIG ] ; then
             find . -name "*$SHLIB_EXT" | xargs $STRIP
         fi
         popd
-        createArchive QtCreator$HOST_QT_CONFIG qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z
-        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.tools.qtcreator/data
-        mv qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z $REPO_PATH_PACKAGES/org.kde.necessitas.tools.qtcreator/data/qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z
+            pushd $(dirname "$QTC_INST_PATH")
+            createArchive "$QTC_INST_DIRNAME" qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z
+            mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.tools.qtcreator/data
+            mv qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z $REPO_PATH_PACKAGES/org.kde.necessitas.tools.qtcreator/data/qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z
+            popd
         popd
     fi
-
-#    mkdir qpatch-build
-#    pushd qpatch-build
-#    if [ ! -f all_done ]
-#    then
-#        $STATIC_QT_PATH/bin/qmake $HOST_QT_CFG $HOST_QM_CFG_OPTIONS -r ../android-qt-creator/src/tools/qpatch/qpatch.pro
-#        if [ "$OSTYPE" = "msys" ]; then
-#            make -f Makefile.Release || error_msg "Can't compile qpatch"
-#        else
-#            make || error_msg "Can't compile qpatch"
-#        fi
-#        echo "all_done">all_done
-#    fi
-
-#    if [ "$OSTYPE" = "msys" ]; then
-#        QPATCH_PATH=$PWD/release/qpatch$EXE_EXT
-#    else
-#        QPATCH_PATH=$PWD/qpatch
-#    fi
-#    popd
 }
 
 # A few things are downloaded as binaries.
@@ -484,7 +453,7 @@ function makeInstallMinGWLibsAndTools
     pushd texinfo
     downloadIfNotExists texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma http://heanet.dl.sourceforge.net/project/mingw/MSYS/texinfo/texinfo-4.13a-2/texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma
     rm -rf texinfo-4.13a-2-msys-1.0.13-bin.tar
-    7za x texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma
+    $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS  texinfo-4.13a-2-msys-1.0.13-bin.tar.lzma
     tar -xvf texinfo-4.13a-2-msys-1.0.13-bin.tar
     mv bin/* /usr/local/bin
     mv share/* /usr/local/share
@@ -590,7 +559,7 @@ function prepareNDKs
         downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
         rm -fr android-ndk-${ANDROID_NDK_VERSION}
         rm -fr android-ndk
-        7za x android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
+        $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
         mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
         mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data
         createArchive android-ndk $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data/android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
@@ -603,7 +572,7 @@ function prepareNDKs
         downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
         rm -fr android-ndk-${ANDROID_NDK_VERSION}
         rm -fr android-ndk
-        7za x android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
+        $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
         mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
         mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data
         createArchive android-ndk $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data/android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
@@ -616,7 +585,7 @@ function prepareNDKs
         downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
         rm -fr android-ndk-${ANDROID_NDK_VERSION}
         rm -fr android-ndk
-        7za x android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
+        $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
         mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
         mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data
         createArchive android-ndk $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ndk.ma/data/android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
@@ -642,23 +611,23 @@ function prepareNDKs
         else
             if [ "$OSTYPE" = "msys" ]; then
                 downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
-                7za x android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
+                $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS android-ndk-${ANDROID_NDK_VERSION}-ma-windows.7z
             fi
 
             if [ "$OSTYPE_MAJOR" = "darwin" ]; then
                 downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
-                7za x android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
+                $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS android-ndk-${ANDROID_NDK_VERSION}-ma-darwin-x86.7z
             fi
 
             if [ "$OSTYPE" = "linux-gnu" ]; then
                 downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z http://mingw-and-ndk.googlecode.com/files/android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
-                7za x android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
+                $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS android-ndk-${ANDROID_NDK_VERSION}-ma-linux-x86.7z
             fi
         fi
     fi
     mv android-ndk-${ANDROID_NDK_VERSION} android-ndk
     export ANDROID_NDK_ROOT=$PWD/android-ndk
-
+    export ANDROID_NDK_TOOLCHAIN_PREFIX=arm-linux-androideabi
     ANDROID_STRIP_BINARY=$ANDROID_NDK_ROOT/toolchains/arm-linux-androideabi-4.6/prebuilt/$HOST_TAG_NDK/bin/arm-linux-androideabi-strip$EXE_EXT
     ANDROID_READELF_BINARY=$ANDROID_NDK_ROOT/toolchains/arm-linux-androideabi-4.6/prebuilt/$HOST_TAG_NDK/bin/arm-linux-androideabi-readelf$EXE_EXT
 }
@@ -1165,12 +1134,12 @@ function compileNecessitasQt #params $1 architecture, $2 package path, $3 NDK_TA
         if [ ! -d android-sdk-linux/platform-tools ]
         then
             rm -fr android-sdk-linux
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.base/data/android-sdk-linux.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.platform_tools/data/platform-tools_${ANDROID_PLATFORM_TOOLS_VERSION}-linux.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_14/data/android-${ANDROID_API_14_VERSION}.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_8/data/android-${ANDROID_API_8_VERSION}.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_7/data/android-${ANDROID_API_7_VERSION}.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_4/data/android-${ANDROID_API_4_VERSION}-linux.7z
+            $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.base/data/android-sdk-linux.7z
+            $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.platform_tools/data/platform-tools_${ANDROID_PLATFORM_TOOLS_VERSION}-linux.7z
+            $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_14/data/android-${ANDROID_API_14_VERSION}.7z
+            $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_8/data/android-${ANDROID_API_8_VERSION}.7z
+            $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_7/data/android-${ANDROID_API_7_VERSION}.7z
+            $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_4/data/android-${ANDROID_API_4_VERSION}-linux.7z
         fi
         export ANDROID_SDK_TOOLS_PATH=$PWD/android-sdk/tools/
         export ANDROID_SDK_PLATFORM_TOOLS_PATH=$PWD/android-sdk/platform-tools/
@@ -1706,7 +1675,7 @@ function packforWindows
     rm -fr $TEMP_PATH/packforWindows
     mkdir -p $TEMP_PATH/packforWindows
     pushd $TEMP_PATH/packforWindows
-        7za x $1/$2.7z
+        $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS $1/$2.7z
         mv Android Android_old
         $CPRL Android_old Android
         rm -fr Android_old
