@@ -4,10 +4,15 @@ OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
+    JOBS=`cat /proc/cpuinfo | grep processor | wc -l`
+    JOBS=`expr $JOBS + 2`
 elif [ "$OSTYPE_MAJOR" = "darwin" ] ; then
     HOST_QT_BRANCH="refs/remotes/origin/ports"
+    JOBS=`sysctl -n hw.ncpu`
+    JOBS=`expr $JOBS + 2`
 else
     HOST_QT_BRANCH="refs/remotes/origin/4.8"
+    JOBS=`expr $NUMBER_OF_PROCESSORS + 2`
 fi
 
 CHECKOUT_BRANCH="unstable"
@@ -20,7 +25,7 @@ if [ ! "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     EXTERNAL_7Z_X_PARAMS="x"
 else
     EXTERNAL_7Z=7z
-    EXTERNAL_7Z_A_PARAMS="a -t7z -mx=9"
+    EXTERNAL_7Z_A_PARAMS="a -t7z -mx=9 -mmt=$JOBS"
     EXTERNAL_7Z_X_PARAMS="-y x"
 fi
 

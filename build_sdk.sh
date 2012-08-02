@@ -101,7 +101,6 @@ if [ "$OSTYPE" = "msys" ] ; then
     EXE_EXT=.exe
     SHLIB_EXT=.dll
     SCRIPT_EXT=.bat
-    JOBS=`expr $NUMBER_OF_PROCESSORS + 2`
 else
     if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
         HOST_CFG_OPTIONS=" -platform macx-g++ -sdk /Developer/SDKs/MacOSX10.6.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
@@ -112,16 +111,12 @@ else
         HOST_TAG=darwin-x86
         HOST_TAG_NDK=darwin-x86
         SHLIB_EXT=.dylib
-        JOBS=`sysctl -n hw.ncpu`
-        JOBS=`expr $JOBS + 2`
     else
         HOST_CFG_OPTIONS=" -platform linux-g++ -arch i386"
 #        HOST_CFG_OPTIONS=" -platform linux-g++-64 -arch x86_64"
         HOST_TAG=linux-x86
         HOST_TAG_NDK=linux-x86
         SHLIB_EXT=.so
-        JOBS=`cat /proc/cpuinfo | grep processor | wc -l`
-        JOBS=`expr $JOBS + 2`
     fi
 fi
 
@@ -140,7 +135,7 @@ function createArchive # params $1 folder, $2 archive name, $3 extra params
         then
             EXTRA_PARAMS="-l"
         fi
-        $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS -mmt=$JOBS $EXTRA_PARAMS $3 $2 "$1" || error_msg "Can't create archive $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS -mmt=$JOBS $2 $1"
+        $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS $EXTRA_PARAMS $3 $2 "$1" || error_msg "Can't create archive $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS $EXTRA_PARAMS $3 $2 $1"
     else
         $SDK_TOOLS_PATH/archivegen "$1" $2
     fi
@@ -348,7 +343,7 @@ function prepareSdkInstallerTools
     git pull
     if [ ! -f all_done ]
     then
-        $STATIC_QT_PATH/bin/qmake CONFIG+=static $HOST_QT_CFG $HOST_QM_CFG_OPTIONS -r || error_msg "Can't configure necessitas-installer-framework"
+        $STATIC_QT_PATH/bin/qmake CONFIG+=static $HOST_QT_CFG $HOST_QM_CFG_OPTIONS QMAKE_CXXFLAGS=-fpermissive -r || error_msg "Can't configure necessitas-installer-framework"
         doMake "Can't compile necessitas-installer-framework" "all done" ma-make
     fi
     popd
@@ -401,8 +396,8 @@ function prepareNecessitasQtCreator
         if [ "$OSTYPE" = "msys" ]; then
             mkdir -p $QTC_INST_PATH/bin
             cp -rf lib/qtcreator/* $QTC_INST_PATH/bin/
-            cp -a /usr/bin/libgcc_s_dw2-1.dll $QTC_INST_PATH/bin/
-            cp -a /usr/bin/libstdc++-6.dll $QTC_INST_PATH/bin/
+            cp -a /mingw/bin/libgcc_s_sjlj-1.dll $QTC_INST_PATH/bin/
+            cp -a /mingw/bin/libstdc++-6.dll $QTC_INST_PATH/bin/
             QT_LIB_DEST=$QTC_INST_PATH/bin/
             cp -a $SHARED_QT_PATH/lib/* $QT_LIB_DEST
             cp -a bin/necessitas.bat $QTC_INST_PATH/bin/
@@ -620,7 +615,7 @@ function prepareNDKs
         rm -fr android-ndk
     fi
 
-    if [ ! -d android-ndk-${ANDROID_NDK_VERSION} ]; then
+    if [ ! -d android-ndk ]; then
         if [ "$USE_MA_NDK" = "0" ]; then
             if [ "$OSTYPE" = "msys" ]; then
                 downloadIfNotExists android-ndk-${ANDROID_NDK_VERSION}-windows.zip http://dl.google.com/android/ndk/android-ndk-${ANDROID_NDK_VERSION}-windows.zip
@@ -1032,7 +1027,7 @@ function prepareSDKs
             gcc -Wl,-subsystem,windows -Wno-write-strings android.cpp -static-libgcc -s -O2 -o android.exe
             popd
             mkdir -p android-sdk-windows/tools/
-            cp android-various/android-sdk/android.exe android-sdk/tools/
+            cp android-various/android-sdk/android.exe android-sdk-windows/tools/
             createArchive android-sdk-windows android-sdk-windows-tools-mingw-android.7z
             mv android-sdk-windows-tools-mingw-android.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.platform_tools/data/android-sdk-windows-tools-mingw-android.7z
             rm -rf android-various
