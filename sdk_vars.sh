@@ -3,15 +3,12 @@ MINISTRO_VERSION="0.4" #Ministro repo version
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
-    HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
     JOBS=`cat /proc/cpuinfo | grep processor | wc -l`
     JOBS=`expr $JOBS + 2`
 elif [ "$OSTYPE_MAJOR" = "darwin" ] ; then
-    HOST_QT_BRANCH="refs/remotes/origin/ports"
     JOBS=`sysctl -n hw.ncpu`
     JOBS=`expr $JOBS + 2`
 else
-    HOST_QT_BRANCH="refs/remotes/origin/4.8"
     JOBS=`expr $NUMBER_OF_PROCESSORS + 2`
 fi
 
@@ -19,14 +16,24 @@ CHECKOUT_BRANCH="unstable"
 
 NECESSITAS_QT_CREATOR_VERSION="2.5.81"
 
-if [ ! "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
-    EXTERNAL_7Z=7za
-    EXTERNAL_7Z_A_PARAMS="a -mx=9"
-    EXTERNAL_7Z_X_PARAMS="x"
-else
+# p7zip sometimes doesn't come with 7z (just 7za),
+#  whereas p7zip-full includes it.
+# Debian 6.0.5 runs an old 7z (9.04) with a -l option
+#  that's since been removed. It dereferences symlinks.
+if [ $(which 7z) ] ; then
     EXTERNAL_7Z=7z
     EXTERNAL_7Z_A_PARAMS="a -t7z -mx=9 -mmt=$JOBS"
+    # Check if version <= 9.04 and use -l when creating windows 7zs if so.
+    EXTERNAL_7Z_VER=$(7z | sed -n 2p | sed -e 's/7-Zip (A) \([0-9]*\)\.\([0-9]*\).*$/\1\2/')
+    if [ ! $EXTERNAL_7Z_VER -gt 904 ] ; then
+        EXTERNAL_7Z_A_PARAMS_WIN="-l"
+    fi
     EXTERNAL_7Z_X_PARAMS="-y x"
+else
+    EXTERNAL_7Z=7za
+    EXTERNAL_7Z_A_PARAMS="a -mx=9"
+    EXTERNAL_7Z_A_PARAMS_WIN=
+    EXTERNAL_7Z_X_PARAMS="x"
 fi
 
 # Qt Framework versions

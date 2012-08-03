@@ -92,17 +92,24 @@ ANDROID_READELF_BINARY=""
 #QPATCH_PATH=""
 EXE_EXT=""
 
-if [ "$OSTYPE" = "msys" ] ; then
-    # -tools-fully-static
-    HOST_CFG_OPTIONS=" -platform win32-g++ -reduce-exports -ms-bitfields -prefix . "
-    HOST_QM_CFG_OPTIONS="CONFIG+=ms_bitfields CONFIG+=static_gcclibs"
-    HOST_TAG=windows
-    HOST_TAG_NDK=windows
-    EXE_EXT=.exe
-    SHLIB_EXT=.dll
-    SCRIPT_EXT=.bat
-else
-    if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+# Call this once initially with $OSTYPE_MAJOR
+# then with msys or darwin before building each
+# cross host's qt, installer-framework or qtcreator
+function set_host_ostype
+{
+    HOST_OSTYPE_MAJOR=$1
+    if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
+        HOST_QT_BRANCH="refs/remotes/origin/ports"
+        # -tools-fully-static was suggested by Oswald, but I fail to see what's wrong with static_gcclibs
+        HOST_CFG_OPTIONS=" -platform win32-g++ -reduce-exports -ms-bitfields -prefix . "
+        HOST_QM_CFG_OPTIONS="CONFIG+=ms_bitfields CONFIG+=static_gcclibs"
+        HOST_TAG=windows
+        HOST_TAG_NDK=windows
+        EXE_EXT=.exe
+        SHLIB_EXT=.dll
+        SCRIPT_EXT=.bat
+    elif [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
+        HOST_QT_BRANCH="refs/remotes/origin/ports"
         HOST_CFG_OPTIONS=" -platform macx-g++ -sdk /Developer/SDKs/MacOSX10.6.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
         HOST_QM_CFG_OPTIONS="CONFIG+=x86 CONFIG+=x86_64"
         # -reduce-exports doesn't work for static Mac OS X i386 build.
@@ -112,13 +119,14 @@ else
         HOST_TAG_NDK=darwin-x86
         SHLIB_EXT=.dylib
     else
+        HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
         HOST_CFG_OPTIONS=" -platform linux-g++ -arch i386"
 #        HOST_CFG_OPTIONS=" -platform linux-g++-64 -arch x86_64"
         HOST_TAG=linux-x86
         HOST_TAG_NDK=linux-x86
         SHLIB_EXT=.so
     fi
-fi
+}
 
 function error_msg
 {
@@ -133,7 +141,7 @@ function createArchive # params $1 folder, $2 archive name, $3 extra params
         EXTRA_PARAMS=""
         if [ $HOST_TAG = "windows" ]
         then
-            EXTRA_PARAMS="-l"
+            EXTRA_PARAMS=$EXTERNAL_7Z_A_PARAMS_WIN
         fi
         $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS $EXTRA_PARAMS $3 $2 "$1" || error_msg "Can't create archive $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS $EXTRA_PARAMS $3 $2 $1"
     else
@@ -258,45 +266,46 @@ function prepareHostQt
         popd
     fi
 
-    export QT_SRCDIR=$PWD/qt-src
-
     if [ "$HOST_QT_CONFIG" = "-d" ] ; then
-        if [ "$OSTYPE" = "msys" ] ; then
+        if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
             OPTS_CFG=" -debug "
             HOST_QT_CFG="CONFIG+=debug"
-        else
-            if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
-                OPTS_CFG=" -debug-and-release "
-                HOST_QT_CFG="CONFIG+=debug"
-            fi
+        elif [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
+            OPTS_CFG=" -debug-and-release "
+            HOST_QT_CFG="CONFIG+=debug"
         fi
     else
         OPTS_CFG=" -release "
         HOST_QT_CFG="CONFIG+=release QT+=network"
     fi
 
-#    if [ "$OSTYPE_MAJOR" = "msys" ] ; then
-#        STATIC_PREFIX="st-b"
-#        SHARED_PREFIX="sh-b"
-#    else
-        STATIC_PREFIX="static-build"
-        SHARED_PREFIX="shared-build"
-#    fi
+    STATIC_PREFIX=static-build
+    SHARED_PREFIX=shared-build
+    if [ ! "$HOST_OSTYPE_MAJOR" = "$OSTYPE_MAJOR" ] ; then
+        STATIC_PREFIX=$STATIC_PREFIX-$HOST_OSTYPE
+        SHARED_PREFIX=$SHARED_PREFIX-$HOST_OSTYPE
+    fi
 
-    # Even on Linux, static Qt 4.8 doesn't build!
+    THIS_QT_BRANCH=$HOST_QT_BRANCH
+    export QT_SRCDIR=$PWD/qt-src
+    if [ "$HOST_OSTYPE_MAJOR" = "msys" -o "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
+      THIS_QT_BRANCH=ports
+      export QT_SRCDIR=$PWD/qt-src-ports
+    fi
+
     mkdir ${STATIC_PREFIX}${HOST_QT_CONFIG}
     pushd ${STATIC_PREFIX}${HOST_QT_CONFIG}
     STATIC_QT_PATH=$PWD
     if [ ! -f all_done ]
     then
         pushd $QT_SRCDIR
-        git checkout -b $(basename $HOST_QT_BRANCH) $HOST_QT_BRANCH
+        git checkout -b $(basename $THIS_QT_BRANCH) $THIS_QT_BRANCH
         git pull
         popd
         rm -fr *
         $QT_SRCDIR/configure -fast -nomake examples -nomake demos -nomake tests -qt-zlib -no-gif -qt-libtiff -qt-libpng -qt-libmng -qt-libjpeg -opensource -static -no-webkit -no-phonon -no-dbus -no-opengl -no-qt3support -no-xmlpatterns -no-svg -confirm-license $HOST_CFG_OPTIONS $HOST_CFG_OPTIONS_STATIC $OPTS_CFG -host-little-endian --prefix=$PWD || error_msg "Can't configure $HOST_QT_VERSION"
         doMake "Can't compile static $HOST_QT_VERSION" "all done" ma-make
-        if [ "$OSTYPE" = "msys" ]; then
+        if [ "$HOST_OSTYPE_MAJOR" = "msys" ]; then
             # Horrible; need to fix this properly.
             doSed $"s/qt warn_on /qt static ms_bitfields static_gcclibs warn_on /" mkspecs/win32-g++/qmake.conf
             doSed $"s/qt warn_on /qt static ms_bitfields static_gcclibs warn_on /" mkspecs/default/qmake.conf
@@ -312,13 +321,13 @@ function prepareHostQt
     if [ ! -f all_done ]
     then
         pushd $QT_SRCDIR
-        git checkout $HOST_QT_BRANCH
+        git checkout $THIS_QT_BRANCH
         git pull
         popd
         rm -fr *
         $QT_SRCDIR/configure $HOST_CFG_OPTIONS -fast -nomake examples -nomake demos -nomake tests -system-zlib -qt-libtiff -qt-libpng -qt-libmng -qt-libjpeg -opensource -shared -webkit -no-phonon -qt-sql-sqlite -plugin-sql-sqlite -no-qt3support -confirm-license $HOST_CFG_OPTIONS $OPTS_CFG -host-little-endian --prefix=$PWD || error_msg "Can't configure $HOST_QT_VERSION"
         doMake "Can't compile shared $HOST_QT_VERSION" "all done" ma-make
-        if [ "$OSTYPE" = "msys" ]; then
+        if [ "$HOST_OSTYPE_MAJOR" = "msys" ]; then
             # Horrible; need to fix this properly.
             doSed $"s/qt warn_on /qt shared ms_bitfields static_gcclibs warn_on /" mkspecs/win32-g++/qmake.conf
             doSed $"s/qt warn_on /qt shared ms_bitfields static_gcclibs warn_on /" mkspecs/default/qmake.conf
@@ -326,7 +335,6 @@ function prepareHostQt
         fi
     fi
     popd
-
 }
 
 function prepareSdkInstallerTools
@@ -1704,7 +1712,7 @@ function packforWindows
         rm -fr Android_old
         find -name *.so.4* | xargs rm -fr
         find -name *.so.1* | xargs rm -fr
-        createArchive Android $1/$2-windows.7z -l
+        createArchive Android $1/$2-windows.7z $EXTERNAL_7Z_A_PARAMS_WIN
     popd
     rm -fr $TEMP_PATH/packforWindows
 }
@@ -1763,6 +1771,8 @@ function prepareWindowsPackages
 
 }
 
+set_host_ostype $OSTYPE_MAJOR
+
 if [ "$OSTYPE_MAJOR" = "msys" ] ; then
     makeInstallMinGWLibsAndTools
 fi
@@ -1786,6 +1796,16 @@ prepareNecessitasQt
 
 if [ "$OSTYPE_MAJOR" != "msys" ] ; then
     prepareNecessitasQtMobility # if [[ `gcc --version` =~ .*llvm.* ]]; => syntax error near `=~'
+fi
+
+if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
+    for CROSS_HOST in msys darwin ; do
+        set_host_ostype $CROSS_HOST
+        prepareHostQt
+        prepareSdkInstallerTools
+        prepareNecessitasQtCreator
+        # TODO :: write prepareSDKHostTools (qmake, moc, uic, rcc, lrelease) for each platform.
+    done
 fi
 
 popd
