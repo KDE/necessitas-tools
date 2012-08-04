@@ -99,9 +99,8 @@ function set_host_ostype
 {
     HOST_OSTYPE_MAJOR=$1
     if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
-        HOST_QT_BRANCH="refs/remotes/origin/ports"
-        # -tools-fully-static was suggested by Oswald, but I fail to see what's wrong with static_gcclibs
-        HOST_CFG_OPTIONS=" -platform win32-g++ -reduce-exports -ms-bitfields -prefix . "
+        HOST_QT_BRANCH="remotes/origin/ports"
+        HOST_CFG_OPTIONS=" -platform win32-g++ -reduce-exports -ms-bitfields -no-freetype -prefix ."
         HOST_QM_CFG_OPTIONS="CONFIG+=ms_bitfields CONFIG+=static_gcclibs"
         HOST_TAG=windows
         HOST_TAG_NDK=windows
@@ -109,7 +108,7 @@ function set_host_ostype
         SHLIB_EXT=.dll
         SCRIPT_EXT=.bat
     elif [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
-        HOST_QT_BRANCH="refs/remotes/origin/ports"
+        HOST_QT_BRANCH="remotes/origin/ports"
         HOST_CFG_OPTIONS=" -platform macx-g++ -sdk /Developer/SDKs/MacOSX10.6.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
         HOST_QM_CFG_OPTIONS="CONFIG+=x86 CONFIG+=x86_64"
         # -reduce-exports doesn't work for static Mac OS X i386 build.
@@ -257,10 +256,18 @@ function prepareHostQt
 {
     # download, compile & install qt, it is used to compile the installer
     HOST_QT_CONFIG=$1
-    if [ ! -d qt-src ]
+
+    THIS_QT_BRANCH=$HOST_QT_BRANCH
+    export QT_SRCDIR=$PWD/qt-src
+    # If cross compiling...
+    if [ "$HOST_OSTYPE_MAJOR" = "msys" -o "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
+      export QT_SRCDIR=$PWD/qt-src-ports
+    fi
+
+    if [ ! -d $(basename $QT_SRCDIR) ]
     then
-        git clone git://anongit.kde.org/android-qt.git qt-src|| error_msg "Can't clone ${1}"
-        pushd qt-src
+        git clone git://anongit.kde.org/android-qt.git $(basename $QT_SRCDIR) || error_msg "Can't clone ${1}"
+        pushd $(basename $QT_SRCDIR)
         git config --add remote.origin.fetch +refs/upstream/*:refs/remotes/upstream/*
         git fetch
         popd
@@ -269,10 +276,10 @@ function prepareHostQt
     if [ "$HOST_QT_CONFIG" = "-d" ] ; then
         if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
             OPTS_CFG=" -debug "
-            HOST_QT_CFG="CONFIG+=debug"
+            HOST_QT_CFG="CONFIG+=debug QT+=network"
         elif [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
             OPTS_CFG=" -debug-and-release "
-            HOST_QT_CFG="CONFIG+=debug"
+            HOST_QT_CFG="CONFIG+=debug QT+=network"
         fi
     else
         OPTS_CFG=" -release "
@@ -284,13 +291,6 @@ function prepareHostQt
     if [ ! "$HOST_OSTYPE_MAJOR" = "$OSTYPE_MAJOR" ] ; then
         STATIC_PREFIX=$STATIC_PREFIX-$HOST_OSTYPE
         SHARED_PREFIX=$SHARED_PREFIX-$HOST_OSTYPE
-    fi
-
-    THIS_QT_BRANCH=$HOST_QT_BRANCH
-    export QT_SRCDIR=$PWD/qt-src
-    if [ "$HOST_OSTYPE_MAJOR" = "msys" -o "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
-      THIS_QT_BRANCH=ports
-      export QT_SRCDIR=$PWD/qt-src-ports
     fi
 
     mkdir ${STATIC_PREFIX}${HOST_QT_CONFIG}
