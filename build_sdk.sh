@@ -1228,6 +1228,58 @@ function compileNecessitasQt #params $1 architecture, $2 package path, $3 NDK_TA
 #    patchQtFiles
 }
 
+function compileNecessitasHostQtTools #params $1 architecture, $2 package path, $3 NDK_TARGET, $4 android architecture
+{
+    package_name=${1//-/_} # replace - with _
+    NDK_TARGET=$3
+    ANDROID_ARCH=$1
+    if [ ! -z $4 ] ; then
+        ANDROID_ARCH=$4
+    fi
+    NQT_INSTALL_DIR=$PWD/install
+
+    if [ "$OSTYPE" = "linux-gnu" ] ; then
+        if [ ! -d android-sdk-linux/platform-tools ]
+        then
+            rm -fr android-sdk-linux
+            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.base/data/android-sdk-linux.7z
+            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.platform_tools/data/platform-tools_${ANDROID_PLATFORM_TOOLS_VERSION}-linux.7z
+            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_14/data/android-${ANDROID_API_14_VERSION}.7z
+            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_8/data/android-${ANDROID_API_8_VERSION}.7z
+            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_7/data/android-${ANDROID_API_7_VERSION}.7z
+            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_4/data/android-${ANDROID_API_4_VERSION}-linux.7z
+        fi
+        export ANDROID_SDK_TOOLS_PATH=$PWD/android-sdk/tools/
+        export ANDROID_SDK_PLATFORM_TOOLS_PATH=$PWD/android-sdk/platform-tools/
+    fi
+
+    if [ ! -f all_done ]
+    then
+         pushd ../qt-src
+         git checkout -f mkspecs
+         popd
+        ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 1 -q 1 -n $TEMP_PATH/android-ndk -a $ANDROID_ARCH -k 0 -i $NQT_INSTALL_DIR || error_msg "Can't configure android-qt"
+        echo "all done">all_done
+    fi
+
+    rm -fr install
+    rm -fr Android
+    unset INSTALL_ROOT
+    make QtJar
+    ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 0 -q 0 -n $TEMP_PATH/android-ndk -a $ANDROID_ARCH -b 0 -k 1 -i $NQT_INSTALL_DIR || error_msg "Can't install android-qt"
+
+    mkdir -p $2/$1
+    cp -rf $NQT_INSTALL_DIR/bin $2/$1
+    createArchive Android qt-tools-${HOST_TAG}.7z
+    rm -fr $2/$1/bin
+    mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.$package_name/data
+    mv qt-tools-${HOST_TAG}.7z $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.$package_name/data/qt-tools-${HOST_TAG}.7z
+    cp -rf $NQT_INSTALL_DIR/* $2/$1
+    cp -rf ../qt-src/lib/*.xml $2/$1/lib/
+    cp -rf jar $2/$1/
+    rm -fr $2/$1/bin
+}
+
 function prepareNecessitasQt
 {
     mkdir -p Android/Qt/$NECESSITAS_QT_VERSION_SHORT
@@ -1278,6 +1330,45 @@ function prepareNecessitasQt
     fi
 
     popd #Android/Qt/$NECESSITAS_QT_VERSION_SHORT
+}
+
+function prepareNecessitasQtTools
+{
+    local XHOST_TAG=$1
+    mkdir -p Android/Qt/$NECESSITAS_QT_VERSION_SHORT
+    pushd Android/Qt/$NECESSITAS_QT_VERSION_SHORT
+
+    if [ ! -d qt-src ]
+    then
+        git clone git://anongit.kde.org/android-qt.git qt-src|| error_msg "Can't clone ${1}"
+    fi
+
+    cloneCheckoutKDEGitRepo android-qt $CHECKOUT_BRANCH
+
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.armeabi/data/qt-tools-${XHOST_TAG}.7z ]
+    then
+        mkdir build-armeabi-${XHOST_TAG}
+        pushd build-armeabi-${XHOST_TAG}
+        compileNecessitasHostQtTools armeabi Android/Qt/$NECESSITAS_QT_VERSION_SHORT 5
+        popd #build-armeabi-${XHOST_TAG}
+    fi
+
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.armeabi_v7a/data/qt-tools-${XHOST_TAG}.7z ]
+    then
+        mkdir build-armeabi-v7a-${XHOST_TAG}
+        pushd build-armeabi-v7a-${XHOST_TAG}
+        compileNecessitasHostQtTools armeabi-v7a Android/Qt/$NECESSITAS_QT_VERSION_SHORT 5
+        popd #build-armeabi-v7a-${XHOST_TAG}
+    fi
+
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.armeabi_android_4/data/qt-tools-${XHOST_TAG}.7z ]
+    then
+        mkdir build-armeabi-android-4-${XHOST_TAG}
+        pushd build-armeabi-android-4-${XHOST_TAG}
+        compileNecessitasHostQtTools armeabi-android-4 Android/Qt/$NECESSITAS_QT_VERSION_SHORT 4 armeabi
+        popd #build-armeabi_android_4-${XHOST_TAG}
+    fi
+
 }
 
 function compileNecessitasQtMobility
@@ -1789,6 +1880,9 @@ prepareNecessitasQtCreator
 mkdir $CHECKOUT_BRANCH
 pushd $CHECKOUT_BRANCH
 prepareNecessitasQt
+prepareNecessitasQtTools windows
+prepareNecessitasQtTools macosx
+
 # TODO :: Fix webkit build in Windows (-no-video fails) and Mac OS X (debug-and-release config incorrectly used and fails)
 # git clone often fails for webkit
 # Webkit is broken currently.
