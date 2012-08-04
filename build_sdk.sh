@@ -46,7 +46,7 @@ REPO_SRC_PATH=$PWD
 TODAY=`date +%Y-%m-%d`
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
-    TEMP_PATH_PREFIX=/tmp
+    TEMP_PATH_PREFIX=/var/tmp
     TEMP_PATH=$TEMP_PATH_PREFIX/necessitas
 else
     TEMP_PATH_PREFIX=/usr
@@ -92,6 +92,17 @@ ANDROID_READELF_BINARY=""
 #QPATCH_PATH=""
 EXE_EXT=""
 
+function get_build_qtplatform
+{
+    if [ "$OSTYPE_MAJOR" = "msys" ] ; then
+       echo win32-g++
+    elif [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+       echo macx-g++
+    else
+       echo linux-g++
+    fi
+}
+
 # Call this once initially with $OSTYPE_MAJOR
 # then with msys or darwin before building each
 # cross host's qt, installer-framework or qtcreator
@@ -100,7 +111,13 @@ function set_host_ostype
     HOST_OSTYPE_MAJOR=$1
     if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
         HOST_QT_BRANCH="remotes/origin/ports"
-        HOST_CFG_OPTIONS=" -platform win32-g++ -reduce-exports -ms-bitfields -no-freetype -prefix ."
+        HOST_CFG_OPTIONS=" -reduce-exports -ms-bitfields -no-freetype  -prefix . -little-endian -host-little-endian -fast " # "-little-endian -host-little-endian -fast" came from BogDan's cross.diff email.
+        if [ $OSTYPE_MAJOR = "msys" ] ; then
+            HOST_CFG_PLATFORM="win32-g++"
+        else
+            HOST_CFG_PLATFORM="linux-mingw-w64-32-g++"
+            HOST_CFG_OPTIONS=$HOST_CFG_OPTIONS" -arch windows"
+        fi
         HOST_QM_CFG_OPTIONS="CONFIG+=ms_bitfields CONFIG+=static_gcclibs"
         HOST_TAG=windows
         HOST_TAG_NDK=windows
@@ -109,7 +126,8 @@ function set_host_ostype
         SCRIPT_EXT=.bat
     elif [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
         HOST_QT_BRANCH="remotes/origin/ports"
-        HOST_CFG_OPTIONS=" -platform macx-g++ -sdk /Developer/SDKs/MacOSX10.6.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
+        HOST_CFG_OPTIONS=" -sdk /Developer/SDKs/MacOSX10.6.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
+        HOST_CFG_PLATFORM="macx-g++"
         HOST_QM_CFG_OPTIONS="CONFIG+=x86 CONFIG+=x86_64"
         # -reduce-exports doesn't work for static Mac OS X i386 build.
         # (ld: bad codegen, pointer diff in fulltextsearch::clucene::QHelpSearchIndexReaderClucene::run()     to global weak symbol vtable for QtSharedPointer::ExternalRefCountDatafor architecture i386)
@@ -119,8 +137,10 @@ function set_host_ostype
         SHLIB_EXT=.dylib
     else
         HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
-        HOST_CFG_OPTIONS=" -platform linux-g++ -arch i386"
-#        HOST_CFG_OPTIONS=" -platform linux-g++-64 -arch x86_64"
+        HOST_CFG_OPTIONS="-arch i386"
+        HOST_CFG_PLATFORM="linux-g++"
+        # HOST_CFG_OPTIONS="-arch x86_64"
+        # HOST_CFG_PLATFORM="linux-g++-64"
         HOST_TAG=linux-x86
         HOST_TAG_NDK=linux-x86
         SHLIB_EXT=.so
@@ -289,8 +309,12 @@ function prepareHostQt
     STATIC_PREFIX=static-build
     SHARED_PREFIX=shared-build
     if [ ! "$HOST_OSTYPE_MAJOR" = "$OSTYPE_MAJOR" ] ; then
-        STATIC_PREFIX=$STATIC_PREFIX-$HOST_OSTYPE
-        SHARED_PREFIX=$SHARED_PREFIX-$HOST_OSTYPE
+        STATIC_PREFIX=$STATIC_PREFIX-$HOST_OSTYPE_MAJOR
+        SHARED_PREFIX=$SHARED_PREFIX-$HOST_OSTYPE_MAJOR
+        HOST_CFG_OPTIONS=$HOST_CFG_OPTIONS" -xplatform $HOST_CFG_PLATFORM -platform $(get_build_qtplatform)"
+        PATH=/var/tmp/i686-w64-mingw32/bin:$PATH
+    else
+        HOST_CFG_OPTIONS=$HOST_CFG_OPTIONS" -platform $HOST_CFG_PLATFORM"
     fi
 
     mkdir ${STATIC_PREFIX}${HOST_QT_CONFIG}
@@ -1308,13 +1332,14 @@ function prepareNecessitasQt
         popd #build-armeabi-v7a
     fi
 
-    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.armeabi_android_4/data/qt-tools-${HOST_TAG}.7z ]
-    then
-        mkdir build-armeabi-android-4
-        pushd build-armeabi-android-4
-        compileNecessitasQt armeabi-android-4 Android/Qt/$NECESSITAS_QT_VERSION_SHORT 4 armeabi
-        popd #build-armeabi_android_4
-    fi
+#    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.armeabi_android_4/data/qt-tools-${HOST_TAG}.7z ]
+#    then
+#        mkdir build-armeabi-android-4
+#        pushd build-armeabi-android-4
+#        compileNecessitasQt armeabi-android-4 Android/Qt/$NECESSITAS_QT_VERSION_SHORT 4 armeabi
+#        popd #build-armeabi_android_4
+#    fi
+
 # Enable it when QtCreator is ready
 #     if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.x86/data/qt-tools-${HOST_TAG}.7z ]
 #     then
@@ -1608,16 +1633,16 @@ function prepareOpenJDK
 
 function prepareAnt
 {
-    mkdir ant
-    pushd ant
     if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ant/data/ant.7z ] ; then
+        mkdir -p ant
+        pushd ant
         mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ant/data
         downloadIfNotExists apache-ant-1.8.4-bin.tar.bz2 http://mirror.ox.ac.uk/sites/rsync.apache.org//ant/binaries/apache-ant-1.8.4-bin.tar.bz2
         tar xjvf apache-ant-1.8.4-bin.tar.bz2
         createArchive apache-ant-1.8.4 ant.7z
         mv ant.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.ant/data/
+        popd
     fi
-    popd
 }
 
 function patchPackages
@@ -1880,17 +1905,19 @@ prepareNecessitasQtCreator
 mkdir $CHECKOUT_BRANCH
 pushd $CHECKOUT_BRANCH
 prepareNecessitasQt
-prepareNecessitasQtTools windows
-prepareNecessitasQtTools macosx
+#prepareNecessitasQtTools windows
+#prepareNecessitasQtTools macosx
 
 # TODO :: Fix webkit build in Windows (-no-video fails) and Mac OS X (debug-and-release config incorrectly used and fails)
 # git clone often fails for webkit
 # Webkit is broken currently.
 # prepareNecessitasQtWebkit
 
-if [ "$OSTYPE_MAJOR" != "msys" ] ; then
-    prepareNecessitasQtMobility # if [[ `gcc --version` =~ .*llvm.* ]]; => syntax error near `=~'
-fi
+#if [ "$OSTYPE_MAJOR" != "msys" ] ; then
+#    prepareNecessitasQtMobility # if [[ `gcc --version` =~ .*llvm.* ]]; => syntax error near `=~'
+#fi
+
+popd
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     for CROSS_HOST in msys darwin ; do
@@ -1901,8 +1928,6 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
         # TODO :: write prepareSDKHostTools (qmake, moc, uic, rcc, lrelease) for each platform.
     done
 fi
-
-popd
 
 #prepareWindowsPackages
 setPackagesVariables
