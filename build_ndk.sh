@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script will mostly die eventually. Lots of it exists to patch up
 # small problems with new build_host scripts in Google's NDK. The goal
@@ -23,8 +23,8 @@ HOST_TOOLS=$BUILD_DIR/host_compiler_tools
 GCC_VER_LINARO=4.6-2012.07
 GCC_VER_LINARO_MAJOR=4.6
 GCC_VER_LINARO_LOCAL=4.6.3
-# ARCHES="arm,mips,x86"
-ARCHES="arm"
+ARCHES="arm,mips,x86"
+#ARCHES="arm"
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 
 # We need a newer MSYS expr.exe and we need it early in this process.
@@ -46,18 +46,21 @@ fi
 
 case $OSTYPE_MAJOR in
     linux*)
-        SYSTEMS=linux-x86,windows-x86
+        SYSTEMS=linux-x86,windows-x86,darwin-x86
         NUM_CORES=$(grep -c -e '^processor' /proc/cpuinfo)
+        BUILD_OS="linux"
         ;;
     darwin|freebsd)
 #       SYSTEMS=darwin-x86,windows-x86
         SYSTEMS=darwin-x86
         NUM_CORES=`sysctl -n hw.ncpu`
+        BUILD_OS="darwin"
         ;;
     windows|msys|cygwin)
         export PATH=$BUILD_DIR/bin:$PATH
         SYSTEMS=darwin-x86,windows-x86
         NUM_CORES=$NUMBER_OF_PROCESSORS
+        BUILD_OS="windows"
         ;;
     *)
         NUM_CORES=8
@@ -326,17 +329,17 @@ build_windows_programs "$BUILD_DIR_TMP" "$BUILD_DIR" "$PWD/misc-patches"
 ###########################################
 
 NDK_TOP="$BUILD_DIR"/android-qt-ndk
-mkdir -p "$NDK_TOP"
 NDK=$NDK_TOP/ndk
-mkdir -p $(dirname "$NDK")
 if [ ! -d $NDK ] ; then
-  git clone http://anongit.kde.org/android-qt-ndk.git $NDK
-  (cd $NDK; git checkout -b ndk-r8b-fixes -t origin/ndk-r8b-fixes)
-  fail_panic "Couldn't clone android-qt-ndk"
+#  git clone http://anongit.kde.org/android-qt-ndk.git $NDK
+#  (cd $NDK; git checkout -b ndk-r8b-fixes -t origin/ndk-r8b-fixes)
+  git clone https://android.googlesource.com/platform/ndk.git $NDK
+  (cd $NDK; git checkout -b ndk-r8b-fixes)
+  fail_panic "Couldn't clone ndk"
 fi
-
 if [ ! -d $NDK_TOP/development ] ; then
     git clone http://android.googlesource.com/platform/development.git $NDK_TOP/development
+    PLATFORMS_SRC=$NDK_TOP/development
 fi
 
 ########################################################
@@ -429,7 +432,6 @@ if [ ! -d "$TC_SRC_DIR" ] ; then
 fi
 
 if [ ! -f $NDK/platforms/android-9/arch-arm/usr/lib/libdl.so ]; then
-  $NDK/build/tools/build-platforms.sh
   # Get the released NDKs and mix the missing bits (libdl.so etc) into our clone of Google's NDK.
   [ ! -f android-ndk-$NDK_VER-linux-x86.tar.bz2 ] && \
     download http://dl.google.com/android/ndk/android-ndk-$NDK_VER-linux-x86.tar.bz2
@@ -491,34 +493,47 @@ done
 
 # Building these in separate folders gives better build.log files as they're
 #  overwritten otherwise.
-PYTHON_BUILD_DIR=$BUILD_DIR_TMP/buildpython
-GDB_BUILD_DIR=$BUILD_DIR_TMP/buildgdb
-GDBSERVER_BUILD_DIR=$BUILD_DIR_TMP/buildgdb
+GCC_BUILD_DIR=$BUILD_DIR_TMP/build/host-gcc
+PYTHON_BUILD_DIR=$BUILD_DIR_TMP/build/host-python
+GDB_BUILD_DIR=$BUILD_DIR_TMP/build/host-gdb
+TARGET_BUILD_DIR=$BUILD_DIR_TMP/build/target
+PACKAGE_DIR=$PWD/release-$DATESUFFIX
 
+mkdir -p $PACKAGE_DIR
+
+if [ "0" = "1" ] ; then
 $NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
   --gmp-version=5.0.5 \
   --force-gold-build \
   --default-ld=gold \
   --systems="$SYSTEMS" \
-  --package-dir=$PWD/release-$DATESUFFIX \
+  --build-dir=$GCC_BUILD_DIR \
+  --package-dir=$PACKAGE_DIR \
     $ARCHES_BY_VERSIONS \
    -j$JOBS
 
-if [ "$(bh_list_contains "linux-$BUILD_ARCH" $SYSTEMS)" = "no" ] ; then
-  SYSTEMSPY=$SYSTEMS",linux-$BUILD_ARCH"
+SYSTEMSLIST=$(commas_to_spaces $SYSTEMS)
+if [ "$(bh_list_contains $BUILD_OS-$BUILD_ARCH $SYSTEMSLIST)" = "no" ] ; then
+  log "Adding $BUILD_OS-$BUILD_ARCH for Python build"
+  SYSTEMSPY=$SYSTEMS",$BUILD_OS-$BUILD_ARCH"
+else
+  SYSTEMSPY=$SYSTEMS
 fi
 
-$NDK/build/tools/build-host-python.sh \
+$NDK/build/tools/build-host-python.sh --toolchain-src-dir=$TC_SRC_DIR \
   --systems="$SYSTEMSPY" \
   --build-dir=$PYTHON_BUILD_DIR \
-  --package-dir=$PWD/release-$DATESUFFIX \
+  --package-dir=$PACKAGE_DIR \
   --python-version=2.7.3 \
    -j$JOBS
+
+fail_panic "build-host-python.sh failed"
+fi
 
 $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
   --systems="$SYSTEMS" \
   --build-dir=$GDB_BUILD_DIR \
-  --package-dir=$PWD/release-$DATESUFFIX \
+  --package-dir=$PACKAGE_DIR \
   --gdb-version=7.3.x \
   --build-dir=$GDB_BUILD_DIR \
   --arch=$ARCHES \
@@ -529,18 +544,19 @@ $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
 rm -rf /tmp/ndk-$USER/build/gdbserver*
 
 # CAN'T CURRENTLY BUILD MIPS LIBS OR GDBSERVER!
-ARCHES_WITHOUT_MIPS=$(bh_list_remove mips $LIST_ARCHES)
-if [ "$LIST_ARCHES" != "$ARCHES_WITHOUT_MIPS" ]; then
-    echo "WARNING :: Removed mips from build-target-prebuilts.sh"
-    echo "        :: to avoid error:"
-    echo "        ::  collect2: cannot find 'ld'"
-fi
-ARCHES_WITHOUT_MIPS=$(spaces_to_commas $ARCHES_WITHOUT_MIPS)
+#ARCHES_WITHOUT_MIPS=$(bh_list_remove mips $LIST_ARCHES)
+#if [ "$LIST_ARCHES" != "$ARCHES_WITHOUT_MIPS" ]; then
+#    echo "WARNING :: Removed mips from build-target-prebuilts.sh"
+#    echo "        :: to avoid error:"
+#    echo "        ::  collect2: cannot find 'ld'"
+#fi
+#ARCHES_WITHOUT_MIPS=$(spaces_to_commas $ARCHES_WITHOUT_MIPS)
+ARCHES_WITHOUT_MIPS=$ARCHES
 
 $NDK/build/tools/build-target-prebuilts.sh \
   --ndk-dir=$NDK \
   --arch="$ARCHES_WITHOUT_MIPS" \
-  --build-dir=$GDBSERVER_BUILD_DIR \
+  --build-dir=$TARGET_BUILD_DIR \
   --package-dir=$PWD/release-$DATESUFFIX \
     $TC_SRC_DIR \
   -j$JOBS
