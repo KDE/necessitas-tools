@@ -108,14 +108,16 @@ function get_build_qtplatform
 function set_host_ostype
 {
     HOST_OSTYPE_MAJOR=$1
+    HOST_STRIP=strip
     if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
         HOST_QT_BRANCH="remotes/origin/ports"
         HOST_CFG_OPTIONS=" -reduce-exports -ms-bitfields -no-freetype -no-fontconfig -prefix . -little-endian -host-little-endian -fast " # "-little-endian -host-little-endian -fast" came from BogDan's cross.diff email.
         if [ $OSTYPE_MAJOR = "msys" ] ; then
             HOST_CFG_PLATFORM="win32-g++"
         else
-            HOST_CFG_PLATFORM="linux-mingw-w64-32-g++"
+            HOST_CFG_PLATFORM="win32-g++-cross"
             HOST_CFG_OPTIONS=$HOST_CFG_OPTIONS" -arch windows"
+            HOST_STRIP="i686-w64-mingw32-strip"
         fi
         HOST_QM_CFG_OPTIONS="CONFIG+=ms_bitfields CONFIG+=static_gcclibs"
         HOST_TAG=windows
@@ -134,6 +136,9 @@ function set_host_ostype
         HOST_TAG=darwin-x86
         HOST_TAG_NDK=darwin-x86
         SHLIB_EXT=.dylib
+        if [ ! $OSTYPE_MAJOR = "darwin" ] ; then
+            HOST_STRIP="i686-apple-darwin11-strip"
+        fi
     else
         HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
         HOST_CFG_OPTIONS="-arch i386"
@@ -380,7 +385,7 @@ function prepareSdkInstallerTools
     popd
     pushd $SDK_TOOLS_PATH
     if [ -z $HOST_QT_CONFIG ] ; then
-        $STRIP *
+        $HOST_STRIP *
     fi
     popd
 }
@@ -388,7 +393,12 @@ function prepareSdkInstallerTools
 
 function prepareNecessitasQtCreator
 {
-    QTC_PATH=android-qt-creator$HOST_QT_CONFIG
+    # Clone to different paths for each host as build is done in-place.
+    if [ "$HOST_OSTYPE_MAJOR" = "msys" -o "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
+        QTC_PATH=android-qt-creator-${HOST_TAG}${HOST_QT_CONFIG}
+    else
+        QTC_PATH=android-qt-creator${HOST_QT_CONFIG}
+    fi
 
     if [ ! -d $QTC_PATH ]
     then
@@ -414,7 +424,7 @@ function prepareNecessitasQtCreator
             $SHARED_QT_PATH/bin/qmake $HOST_QT_CFG $HOST_QM_CFG_OPTIONS -r || error_msg "Can't configure android-qt-creator"
             doMake "Can't compile $QTC_PATH" "all done" ma-make
         fi
-        if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+        if [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
             # Mac doesn't use INSTALL_ROOT (except docs/translations where it'd be incorrect)
             mkdir -p $INSTALL_ROOT/bin
             export INSTALL_ROOT="$QTC_INST_PATH"
@@ -424,7 +434,7 @@ function prepareNecessitasQtCreator
             make docs install
         fi
 
-        if [ "$OSTYPE" = "msys" ]; then
+        if [ "$HOST_OSTYPE_MAJOR" = "msys" ]; then
             mkdir -p $QTC_INST_PATH/bin
             cp -rf lib/qtcreator/* $QTC_INST_PATH/bin/
             cp -a /mingw/bin/libgcc_s_sjlj-1.dll $QTC_INST_PATH/bin/
@@ -440,7 +450,7 @@ function prepareNecessitasQtCreator
 #            popd
 #            cp android-various/make-3.82-build/make.exe $QTC_INST_PATH/bin/
             cp /usr/local/bin/ma-make.exe $QTC_INST_PATH/bin/make.exe
-        elif [ "$OSTYPE" = "linux-gnu" ]; then
+        elif [ "$HOST_OSTYPE_MAJOR" = "linux-gnu" ]; then
             mkdir -p $QTC_INST_PATH/Qt/imports
             mkdir -p $QTC_INST_PATH/Qt/plugins
             mkdir -p $QTC_INST_PATH/Qt/lib
@@ -457,7 +467,7 @@ function prepareNecessitasQtCreator
         cp -a bin/necessitas*.png "$QTC_INST_PATH/images/"
         pushd "$QTC_INST_PATH"
         if [ -z $HOST_QT_CONFIG ] ; then
-            find . -name "*$SHLIB_EXT" | xargs $STRIP
+            find . -name "*$SHLIB_EXT" | xargs $HOST_STRIP
         fi
         popd
             pushd $(dirname "$QTC_INST_PATH")
