@@ -24,7 +24,7 @@ if [ $(which 7z) ] ; then
     EXTERNAL_7Z=7z
     EXTERNAL_7Z_A_PARAMS="a -t7z -mx=9 -mmt=$JOBS"
     # Check if version <= 9.04 and use -l when creating windows 7zs if so.
-    EXTERNAL_7Z_VER=$(7z | sed -n 2p | sed -e 's/7-Zip (A) \([0-9]*\)\.\([0-9]*\).*$/\1\2/')
+    EXTERNAL_7Z_VER=$(7z | sed -n 2p | sed -e 's/7-Zip[ A-Z\(\)]*\([0-9]*\)\.\([0-9]*\).*$/\1\2/')
     if [ ! $EXTERNAL_7Z_VER -gt 904 ] ; then
         EXTERNAL_7Z_A_PARAMS_WIN="-l"
     fi
