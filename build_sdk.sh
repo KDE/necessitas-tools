@@ -575,7 +575,7 @@ function makeInstallMinGWLibs
     popd
 }
 
-function makeInstallMinGWLibs
+function makeInstallMinGWLibsOld
 {
     mkdir mingw-bits
     pushd mingw-bits
