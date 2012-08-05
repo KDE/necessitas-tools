@@ -311,7 +311,7 @@ function prepareHostQt
         STATIC_PREFIX=$STATIC_PREFIX-$HOST_OSTYPE_MAJOR
         SHARED_PREFIX=$SHARED_PREFIX-$HOST_OSTYPE_MAJOR
         HOST_CFG_OPTIONS=$HOST_CFG_OPTIONS" -xplatform $HOST_CFG_PLATFORM -platform $(get_build_qtplatform)"
-        PATH=/var/tmp/i686-w64-mingw32/bin:$PATH
+        export PATH=${TEMP_PATH}/host_compiler_tools/mingw/i686-w64-mingw32/bin:$PATH
     else
         HOST_CFG_OPTIONS=$HOST_CFG_OPTIONS" -platform $HOST_CFG_PLATFORM"
     fi
@@ -472,7 +472,7 @@ function prepareNecessitasQtCreator
 # This installs the libs directly into the mingw-w64 installation folders
 # as determined by ${HOST_CC_PREFIX}gcc --print-search-dirs. This is the
 # cleanest way I think.
-function makeInstallMinGWLibsAndTools
+function makeInstallMinGWLibs
 {
     if [ ! $"OSTYPE_MAJOR" = "msys" ] ; then
         HOST_CC_PREFIX="i686-w64-mingw32-"
@@ -494,15 +494,15 @@ function makeInstallMinGWLibsAndTools
     MINGW_PREFIX=$(dirname $(dirname $(dirname $MINGW_PREFIX)))
     MINGW_PREFIX=$MINGW_PREFIX/$MINGW_TOPLEV
 
-    if [ -d mingw-bits ] ; then
+    if [ -d mingw-w64-libs-build ] ; then
         return
     fi
 
     mkdir -p ${MINGW_PREFIX}/bin
     mkdir -p ${MINGW_PREFIX}/share
 
-    mkdir mingw-bits
-    pushd mingw-bits
+    mkdir mingw-w64-libs-build
+    pushd mingw-w64-libs-build
 
 #    mkdir texinfo
 #    pushd texinfo
@@ -565,8 +565,9 @@ function makeInstallMinGWLibsAndTools
         pushd libiconv-1.14
         ./configure ${HOST_CONFIG} --enable-static --disable-shared --with-curses=$install_dir --enable-multibyte --prefix=${MINGW_PREFIX}  CFLAGS=-O3 CC=${HOST_CC_PREFIX}gcc
         make
-        # Without the /mingw folder, this fails, but only after copying libiconv.a to the right place.
+        # Without a /mingw folder, this fails, but only after copying libiconv.a to the right place.
         make install
+        doSed $"s/iconv_t cd,  char\* \* inbuf/iconv_t cd,  const char\* \* inbuf/g" include/iconv.h
         cp include/iconv.h ${MINGW_PREFIX}/include
         popd
     fi
@@ -1924,6 +1925,8 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     *)
       echo "Refusing to continue as you are on a $TEST_BUILD_ARCH machine"
       echo "Various things (e.g. cross compilation) will fail."
+      echo "Re-run with:"
+      echo "linux32 $0 $@"
       exit 1
       ;;
    esac
@@ -1932,7 +1935,7 @@ fi
 set_host_ostype $OSTYPE_MAJOR
 
 if [ "$OSTYPE_MAJOR" = "msys" ] ; then
-    makeInstallMinGWLibsAndTools
+    makeInstallMinGWLibs
 fi
 prepareHostQt
 prepareSdkInstallerTools
@@ -1965,7 +1968,7 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     for CROSS_HOST in msys darwin ; do
         set_host_ostype $CROSS_HOST
         if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
-            makeInstallMinGWLibsAndTools
+            makeInstallMinGWLibs
         fi
         prepareHostQt
         prepareSdkInstallerTools
