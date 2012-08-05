@@ -17,8 +17,13 @@ VERBOSE=1
 
 NDK_VER=r8b
 DATESUFFIX=$(date +%y%m%d)
-BUILD_DIR=$HOME/necessitas-tmp
-BUILD_DIR_TMP=$BUILD_DIR/ndk-tmp
+# This must be the same as TEMP_PATH in build_sdk.sh
+if [ "$OSTYPE_MAJOR" = "msys" ] ; then
+    BUILD_DIR=/usr/nec
+else
+    BUILD_DIR=/var/tmp/necessitas
+fi
+BUILD_DIR_TMP=$BUILD_DIR/ndk-build
 HOST_TOOLS=$BUILD_DIR/host_compiler_tools
 GCC_VER_LINARO=4.6-2012.07
 GCC_VER_LINARO_MAJOR=4.6
@@ -27,12 +32,30 @@ ARCHES="arm,mips,x86"
 #ARCHES="arm"
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 
+if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
+   if [ ! -d /proc ] ; then
+      echo "Refusing to continue as /proc is not mounted"
+      echo "You may need to run $HOME/setup.sh in your chroot env"
+      exit 1
+   fi
+   TEST_BUILD_ARCH=$(arch)
+   case $TEST_BUILD_ARCH in
+   i?86*)
+      ;;
+    *)
+      echo "Warning, you are on a $TEST_BUILD_ARCH machine"
+      echo "it *might* be safer to run this via linux32,"
+      echo "but it'll probably be fine."
+      ;;
+   esac
+fi
+
 # We need a newer MSYS expr.exe and we need it early in this process.
 # I made one from coreutils-8.17.
 # If you used BootstrapMinGW64.vbs to create your mingw-w64
 #  environment then that will have copied this expr into the bin folder
 #  already, but in-case you didn't...
-if [ "$OSTYPE" = "msys" ] ; then
+if [ "$OSTYPE_MAJOR" = "msys" ] ; then
   echo "Testing expr.exe"
   EXPR_RESULT=`expr -- "--test=<value>" : '--[^=]*=\(<.*>\)' 2>&1 > /dev/null`
   if [ ! "$EXPR_RESULT" = "<value>" ] ; then
@@ -287,7 +310,7 @@ build_windows_programs ()
   local PREFIX=$2
   local PATCHES=$3
 
-  if [ "$OSTYPE" = "msys" ] ; then
+  if [ "$OSTYPE_MAJOR" = "msys" ] ; then
     if [ -z $(which file) ] ; then
     (cd $BUILDDIR;
       if ! $(curl -S -L -O http://kent.dl.sourceforge.net/project/mingw/Other/UserContributed/regex/mingw-regex-2.5.1/mingw-libgnurx-2.5.1-src.tar.gz); then
@@ -305,6 +328,8 @@ build_windows_programs ()
       make -j$JOBS install
       popd
 
+      # This is WIP. Can't remember where in the process file is used either!
+      # I think an arch is figured out somewhere using it.
       curl -S -L -O ftp://ftp.astron.com/pub/file/file-5.11.tar.gz
       tar -xvf file-5.11.tar.gz
       (cd file-5.11
@@ -331,10 +356,10 @@ build_windows_programs "$BUILD_DIR_TMP" "$BUILD_DIR" "$PWD/misc-patches"
 NDK_TOP="$BUILD_DIR"/android-qt-ndk
 NDK=$NDK_TOP/ndk
 if [ ! -d $NDK ] ; then
-#  git clone http://anongit.kde.org/android-qt-ndk.git $NDK
-#  (cd $NDK; git checkout -b ndk-r8b-fixes -t origin/ndk-r8b-fixes)
-  git clone https://android.googlesource.com/platform/ndk.git $NDK
-  (cd $NDK; git checkout -b ndk-r8b-fixes)
+  git clone http://anongit.kde.org/android-qt-ndk.git $NDK
+  (cd $NDK; git checkout -b ndk-r8b-fixes -t origin/ndk-r8b-fixes)
+#  git clone https://android.googlesource.com/platform/ndk.git $NDK
+#  (cd $NDK; git checkout -b ndk-r8b-fixes)
   fail_panic "Couldn't clone ndk"
 fi
 if [ ! -d $NDK_TOP/development ] ; then
@@ -350,7 +375,7 @@ fi
 # Debian env.
 # Otherwise, we use it, assuming that Linux is the only OS worth doing
 # this kind of cross compilation task on (IMHO, it is).
-if [ "$OSTYPE" = "linux-gnu" ] ; then
+if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
   DEBIAN_VERSION=
   if [ -f /etc/debian_version ] ; then
     DEBIAN_VERSION=$(head -n 1 /etc/debian_version)
@@ -358,7 +383,7 @@ if [ "$OSTYPE" = "linux-gnu" ] ; then
 
   # BINPREFIX is needed for building highly compatiable mingw-w64 toolchains.
   BINPREFIX=
-  if [ ! "$DEBIAN_VERSION" = "6.0.5" -a ] ; then
+  if [ ! "$DEBIAN_VERSION" = "6.0.5" -a "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     if [ ! -d $HOST_TOOLS/linux ] ; then
       (mkdir -p $HOST_TOOLS/linux; cd /tmp; \
        download http://mingw-and-ndk.googlecode.com/files/i686-linux-glibc2.7-4.4.3.tar.bz2; \

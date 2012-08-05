@@ -45,12 +45,11 @@ done
 REPO_SRC_PATH=$PWD
 TODAY=`date +%Y-%m-%d`
 
-if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
-    TEMP_PATH_PREFIX=/var/tmp
-    TEMP_PATH=$TEMP_PATH_PREFIX/necessitas
+# This must be the same as BUILD_DIR in build_ndk.sh
+if [ "$OSTYPE_MAJOR" = "msys" ] ; then
+    TEMP_PATH=/usr/nec
 else
-    TEMP_PATH_PREFIX=/usr
-    TEMP_PATH=$TEMP_PATH_PREFIX/nec
+    TEMP_PATH=/var/tmp/necessitas
 fi
 
 if [ "$OSTYPE_MAJOR" = "darwin" ]; then
@@ -111,7 +110,7 @@ function set_host_ostype
     HOST_OSTYPE_MAJOR=$1
     if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
         HOST_QT_BRANCH="remotes/origin/ports"
-        HOST_CFG_OPTIONS=" -reduce-exports -ms-bitfields -no-freetype  -prefix . -little-endian -host-little-endian -fast " # "-little-endian -host-little-endian -fast" came from BogDan's cross.diff email.
+        HOST_CFG_OPTIONS=" -reduce-exports -ms-bitfields -no-freetype -no-fontconfig -prefix . -little-endian -host-little-endian -fast " # "-little-endian -host-little-endian -fast" came from BogDan's cross.diff email.
         if [ $OSTYPE_MAJOR = "msys" ] ; then
             HOST_CFG_PLATFORM="win32-g++"
         else
@@ -470,11 +469,24 @@ function prepareNecessitasQtCreator
     fi
 }
 
-# A few things are downloaded as binaries.
+# This installs the libs directly into the mingw-w64 installation folders
+# as determined by ${HOST_CC_PREFIX}gcc --print-search-dirs. This is the
+# cleanest way I think.
 function makeInstallMinGWLibsAndTools
 {
-    # Calculate the gcc install prefix from the install location of mingw gcc... horrible.
-    MINGW_PREFIX=$(gcc --print-search-dirs | head -1 | cut -d' ' -f 2)
+    if [ ! $"OSTYPE_MAJOR" = "msys" ] ; then
+        HOST_CC_PREFIX="i686-w64-mingw32-"
+        HOST_CONFIG="--host=i686-w64-mingw32"
+        export PATH=${TEMP_PATH}/host_compiler_tools/mingw/i686-w64-mingw32/bin:$PATH
+    else
+        HOST_CC_PREFIX=
+        HOST_CONFIG=
+    fi
+
+    # Calculate the gcc install prefix from the install location of mingw gcc. Makes a few
+    # assumptions about the output format of --print-search-dirs but better than any
+    # alternative I can come up with.
+    MINGW_PREFIX=$(${HOST_CC_PREFIX}gcc --print-search-dirs | head -1 | cut -d' ' -f 2)
     MINGW_PREFIX=$(echo $MINGW_PREFIX | sed 's/\\/\//g')
     MINGW_PREFIX=$(cd $MINGW_PREFIX; echo $PWD)
     MINGW_PREFIX=$(dirname $MINGW_PREFIX)
@@ -502,32 +514,38 @@ function makeInstallMinGWLibsAndTools
 #    mv share/* /usr/local/share
 #    popd
 
-    # pdcurses must be in /usr for gdb configure to work (though I'd prefer if mingw gcc would look in /usr/local too!)
-    downloadIfNotExists PDCurses-3.4.tar.gz http://downloads.sourceforge.net/pdcurses/pdcurses/3.4/PDCurses-3.4.tar.gz
-    rm -rf PDCurses-3.4
-    tar -xvzf PDCurses-3.4.tar.gz
-    pushd PDCurses-3.4/win32
-    sed '90s/-copy/-cp/' mingwin32.mak > mingwin32-fixed.mak
-    make -f mingwin32-fixed.mak WIDE=Y UTF8=Y DLL=N
-    cp pdcurses.a ${MINGW_PREFIX}/lib/libcurses.a
-    cp pdcurses.a ${MINGW_PREFIX}/lib/libncurses.a
-    cp pdcurses.a ${MINGW_PREFIX}/lib/libpdcurses.a
-    cp panel.a ${MINGW_PREFIX}/lib/libpanel.a
-    cp ../curses.h ${MINGW_PREFIX}/include
-    cp ../panel.h ${MINGW_PREFIX}/include
-    popd
+    if [ ! -f ${MINGW_PREFIX}/lib/libcurses.a ] ; then
+        downloadIfNotExists PDCurses-3.4.tar.gz http://downloads.sourceforge.net/pdcurses/pdcurses/3.4/PDCurses-3.4.tar.gz
+        rm -rf PDCurses-3.4
+        tar -xvzf PDCurses-3.4.tar.gz
+        pushd PDCurses-3.4/win32
+        # I should really make and submit a patch for this instead.
+        doSed $"90s/-copy/-cp/" mingwin32.mak
+        doSed $"s/CC		= gcc/CC		= gcc\nAR		= ar\nRANLIB		= ranlib/" mingwin32.mak
+        doSed $"s/	\$(LIBEXE) \$(LIBFLAGS) \$@ \$?/	\$(LIBEXE) \$(LIBFLAGS) \$@ \$?\n	\$(RANLIB) \$@/" mingwin32.mak
+        doSed $"s/LIBEXE = gcc \$(DEFFILE)/LIBEXE = \$(CC) \$(DEFFILE)/" mingwin32.mak
+        doSed $"s/LINK		= gcc/LINK		= \$(CC)/" mingwin32.mak
+        make -f mingwin32.mak WIDE=Y UTF8=Y DLL=N CC=${HOST_CC_PREFIX}gcc AR=${HOST_CC_PREFIX}ar RANLIB=${HOST_CC_PREFIX}ranlib
+        cp pdcurses.a ${MINGW_PREFIX}/lib/libcurses.a
+        cp pdcurses.a ${MINGW_PREFIX}/lib/libncurses.a
+        cp pdcurses.a ${MINGW_PREFIX}/lib/libpdcurses.a
+        cp panel.a ${MINGW_PREFIX}/lib/libpanel.a
+        cp ../curses.h ${MINGW_PREFIX}/include
+        cp ../panel.h ${MINGW_PREFIX}/include
+        popd
+    fi
 
     # download, compile & install zlib to /usr
-    downloadIfNotExists zlib-1.2.7.tar.gz http://downloads.sourceforge.net/libpng/zlib/1.2.7/zlib-1.2.7.tar.gz
     if [ ! -f ${MINGW_PREFIX}/lib/libz.a ] ; then
+        downloadIfNotExists zlib-1.2.7.tar.gz http://downloads.sourceforge.net/libpng/zlib/1.2.7/zlib-1.2.7.tar.gz
         tar -xvzf zlib-1.2.7.tar.gz
         pushd zlib-1.2.7
         doSed $"s#/usr/local#${MINGW_PREFIX}#" win32/Makefile.gcc
-        make -f win32/Makefile.gcc
+        make -f win32/Makefile.gcc CC=${HOST_CC_PREFIX}gcc PREFIX=${HOST_CC_PREFIX}
         export INCLUDE_PATH=${MINGW_PREFIX}/include
         export LIBRARY_PATH=${MINGW_PREFIX}/lib
         export BINARY_PATH=${MINGW_PREFIX}/bin
-        make -f win32/Makefile.gcc install
+        make -f win32/Makefile.gcc install PREFIX=${HOST_CC_PREFIX}
         rm -rf zlib-1.2.7
         popd
     fi
@@ -535,19 +553,23 @@ function makeInstallMinGWLibsAndTools
     # This make can't build gdb or python (it doesn't re-interpret MSYS mounts), but includes jobserver patch from
     # Troy Runkel: http://article.gmane.org/gmane.comp.gnu.make.windows/3223/match=
     # which fixes the longstanding make.exe -jN process hang, allowing un-attended builds of all Qt things.
-    downloadIfNotExists make.exe http://mingw-and-ndk.googlecode.com/files/make.exe
-    mv make.exe /usr/local/bin/ma-make.exe
+    if [ "$OSTYPE_MAJOR" = "msys" ] ; then
+        downloadIfNotExists make.exe http://mingw-and-ndk.googlecode.com/files/make.exe
+        mv make.exe /usr/local/bin/ma-make.exe
+    fi
 
-    downloadIfNotExists libiconv-1.14.tar.gz http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
-    rm -rf libiconv-1.14
-    tar -xvzf libiconv-1.14.tar.gz
-    pushd libiconv-1.14
-    CFLAGS=-O2 && ./configure --enable-static --disable-shared --with-curses=$install_dir --enable-multibyte --prefix=${MINGW_PREFIX}  CFLAGS=-O3
-    make
-    # Without the /mingw folder, this fails, but only after copying libiconv.a to the right place.
-    make install
-    cp include/iconv.h ${MINGW_PREFIX}/include
-    popd
+    if [ ! -f ${MINGW_PREFIX}/lib/libiconv.a ] ; then
+        downloadIfNotExists libiconv-1.14.tar.gz http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
+        rm -rf libiconv-1.14
+        tar -xvzf libiconv-1.14.tar.gz
+        pushd libiconv-1.14
+        ./configure ${HOST_CONFIG} --enable-static --disable-shared --with-curses=$install_dir --enable-multibyte --prefix=${MINGW_PREFIX}  CFLAGS=-O3 CC=${HOST_CC_PREFIX}gcc
+        make
+        # Without the /mingw folder, this fails, but only after copying libiconv.a to the right place.
+        make install
+        cp include/iconv.h ${MINGW_PREFIX}/include
+        popd
+    fi
 
     popd
 }
@@ -1887,6 +1909,26 @@ function prepareWindowsPackages
 
 }
 
+# Sorry for adding these checks BogDan, but I keep forgetting to run setup.sh
+# and use linux32.
+if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
+   if [ ! -d /proc ] ; then
+      echo "Refusing to continue as /proc is not mounted"
+      echo "You may need to run $HOME/setup.sh in your chroot env"
+      exit 1
+   fi
+   TEST_BUILD_ARCH=$(arch)
+   case $TEST_BUILD_ARCH in
+   i?86*)
+      ;;
+    *)
+      echo "Refusing to continue as you are on a $TEST_BUILD_ARCH machine"
+      echo "Various things (e.g. cross compilation) will fail."
+      exit 1
+      ;;
+   esac
+fi
+
 set_host_ostype $OSTYPE_MAJOR
 
 if [ "$OSTYPE_MAJOR" = "msys" ] ; then
@@ -1922,6 +1964,9 @@ popd
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     for CROSS_HOST in msys darwin ; do
         set_host_ostype $CROSS_HOST
+        if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
+            makeInstallMinGWLibsAndTools
+        fi
         prepareHostQt
         prepareSdkInstallerTools
         prepareNecessitasQtCreator
