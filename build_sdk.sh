@@ -94,7 +94,7 @@ EXE_EXT=""
 function get_build_qtplatform
 {
     if [ "$OSTYPE_MAJOR" = "msys" ] ; then
-       echo win32-g++
+       echo win32-g++-4.6
     elif [ "$OSTYPE_MAJOR" = "darwin" ] ; then
        echo macx-g++
     else
@@ -105,7 +105,7 @@ function get_build_qtplatform
 # Call this once initially with $OSTYPE_MAJOR
 # then with msys or darwin before building each
 # cross host's qt, installer-framework or qtcreator
-function set_host_ostype
+function Set_HOST_OSTYPE
 {
     HOST_OSTYPE_MAJOR=$1
     HOST_STRIP=strip
@@ -118,6 +118,7 @@ function set_host_ostype
             HOST_CFG_PLATFORM="win32-g++-cross"
             HOST_CFG_OPTIONS=$HOST_CFG_OPTIONS" -arch windows"
             HOST_STRIP="i686-w64-mingw32-strip"
+            export PATH=${TEMP_PATH}/host_compiler_tools/mingw/i686-w64-mingw32/bin:$PATH
         fi
         HOST_QM_CFG_OPTIONS="CONFIG+=ms_bitfields CONFIG+=static_gcclibs"
         HOST_TAG=windows
@@ -127,8 +128,15 @@ function set_host_ostype
         SCRIPT_EXT=.bat
     elif [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
         HOST_QT_BRANCH="remotes/origin/ports"
-        HOST_CFG_OPTIONS=" -sdk /Developer/SDKs/MacOSX10.6.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
-        HOST_CFG_PLATFORM="macx-g++"
+        if [ $OSTYPE_MAJOR = "darwin" ] ; then
+            HOST_CFG_PLATFORM="macx-g++"
+            HOST_CFG_OPTIONS=" -little-endian -sdk /Developer/SDKs/MacOSX10.6.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
+        else
+            HOST_CFG_PLATFORM="macx-g++-cross"
+            export PATH=${TEMP_PATH}/host_compiler_tools/darwin/apple-osx/bin:$PATH
+            HOST_CFG_OPTIONS=" -little-endian -sdk $HOME/MacOSX10.7.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
+            HOST_STRIP="i686-apple-darwin11-strip"
+        fi
         HOST_QM_CFG_OPTIONS="CONFIG+=x86 CONFIG+=x86_64"
         # -reduce-exports doesn't work for static Mac OS X i386 build.
         # (ld: bad codegen, pointer diff in fulltextsearch::clucene::QHelpSearchIndexReaderClucene::run()     to global weak symbol vtable for QtSharedPointer::ExternalRefCountDatafor architecture i386)
@@ -285,7 +293,7 @@ function prepareHostQt
     export QT_SRCDIR=$PWD/qt-src
     # If cross compiling...
     if [ "$HOST_OSTYPE_MAJOR" = "msys" -o "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
-      export QT_SRCDIR=$PWD/qt-src-ports
+        export QT_SRCDIR=$PWD/qt-src-ports
     fi
 
     if [ ! -d $(basename $QT_SRCDIR) ]
@@ -315,8 +323,12 @@ function prepareHostQt
     if [ ! "$HOST_OSTYPE_MAJOR" = "$OSTYPE_MAJOR" ] ; then
         STATIC_PREFIX=$STATIC_PREFIX-$HOST_OSTYPE_MAJOR
         SHARED_PREFIX=$SHARED_PREFIX-$HOST_OSTYPE_MAJOR
-        HOST_CFG_OPTIONS=$HOST_CFG_OPTIONS" -xplatform $HOST_CFG_PLATFORM -platform $(get_build_qtplatform)"
-        export PATH=${TEMP_PATH}/host_compiler_tools/mingw/i686-w64-mingw32/bin:$PATH
+        HOST_CFG_OPTIONS="-xplatform $HOST_CFG_PLATFORM -platform $(get_build_qtplatform) "$HOST_CFG_OPTIONS
+        if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
+            export PATH=${TEMP_PATH}/host_compiler_tools/mingw/i686-w64-mingw32/bin:$PATH
+        else
+            export PATH=${TEMP_PATH}/host_compiler_tools/darwin/apple-osx/bin:$PATH
+        fi
     else
         HOST_CFG_OPTIONS=$HOST_CFG_OPTIONS" -platform $HOST_CFG_PLATFORM"
     fi
@@ -335,8 +347,6 @@ function prepareHostQt
         doMake "Can't compile static $HOST_QT_VERSION" "all done" ma-make
         if [ "$HOST_OSTYPE_MAJOR" = "msys" ]; then
             # Horrible; need to fix this properly.
-            doSed $"s/qt warn_on /qt static ms_bitfields static_gcclibs warn_on /" mkspecs/win32-g++/qmake.conf
-            doSed $"s/qt warn_on /qt static ms_bitfields static_gcclibs warn_on /" mkspecs/default/qmake.conf
             cp -f mkspecs/win32-g++/qplatformdefs.h mkspecs/default/
         fi
     fi
@@ -357,8 +367,6 @@ function prepareHostQt
         doMake "Can't compile shared $HOST_QT_VERSION" "all done" ma-make
         if [ "$HOST_OSTYPE_MAJOR" = "msys" ]; then
             # Horrible; need to fix this properly.
-            doSed $"s/qt warn_on /qt shared ms_bitfields static_gcclibs warn_on /" mkspecs/win32-g++/qmake.conf
-            doSed $"s/qt warn_on /qt shared ms_bitfields static_gcclibs warn_on /" mkspecs/default/qmake.conf
             cp -f mkspecs/win32-g++/qplatformdefs.h mkspecs/default/
         fi
     fi
@@ -369,18 +377,25 @@ function prepareSdkInstallerTools
 {
     # get installer source code
     SDK_TOOLS_PATH=$PWD/necessitas-installer-framework/installerbuilder/bin
-    if [ ! -d necessitas-installer-framework ]
-    then
-        git clone git://anongit.kde.org/necessitas-installer-framework.git necessitas-installer-framework || error_msg "Can't clone necessitas-installer-framework"
+
+    if [ "$HOST_OSTYPE_MAJOR" = "msys" -o "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
+        QTINST_PATH=necessitas-installer-framework-${HOST_TAG}${HOST_QT_CONFIG}
+    else
+        QTINST_PATH=necessitas-installer-framework
     fi
 
-    pushd necessitas-installer-framework/installerbuilder
+    if [ ! -d $QTINST_PATH ]
+    then
+        git clone git://anongit.kde.org/necessitas-installer-framework.git $QTINST_PATH || error_msg "Can't clone necessitas-installer-framework"
+    fi
+
+    pushd $QTINST_PATH/installerbuilder
     git checkout $CHECKOUT_BRANCH
     git pull
     if [ ! -f all_done ]
     then
-        $STATIC_QT_PATH/bin/qmake CONFIG+=static $HOST_QT_CFG $HOST_QM_CFG_OPTIONS QMAKE_CXXFLAGS=-fpermissive -r || error_msg "Can't configure necessitas-installer-framework"
-        doMake "Can't compile necessitas-installer-framework" "all done" ma-make
+        $STATIC_QT_PATH/bin/qmake CONFIG+=static $HOST_QT_CFG $HOST_QM_CFG_OPTIONS QMAKE_CXXFLAGS=-fpermissive -r || error_msg "Can't configure $QTINST_PATH"
+        doMake "Can't compile $QTINST_PATH" "all done" ma-make
     fi
     popd
     pushd $SDK_TOOLS_PATH
@@ -421,7 +436,7 @@ function prepareNecessitasQtCreator
             git pull
             export UPDATEINFO_DISABLE=false
             # DEFINES+=IDE_SETTINGSVARIANT=Necessitas
-            $SHARED_QT_PATH/bin/qmake $HOST_QT_CFG $HOST_QM_CFG_OPTIONS -r || error_msg "Can't configure android-qt-creator"
+            $SHARED_QT_PATH/bin/qmake CONFIG+=shared $HOST_QT_CFG $HOST_QM_CFG_OPTIONS -r || error_msg "Can't configure android-qt-creator"
             doMake "Can't compile $QTC_PATH" "all done" ma-make
         fi
         if [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
@@ -1942,7 +1957,7 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
    esac
 fi
 
-set_host_ostype $OSTYPE_MAJOR
+Set_HOST_OSTYPE $OSTYPE_MAJOR
 
 if [ "$OSTYPE_MAJOR" = "msys" ] ; then
     makeInstallMinGWLibs
@@ -1960,7 +1975,7 @@ prepareNecessitasQtCreator
 mkdir $CHECKOUT_BRANCH
 pushd $CHECKOUT_BRANCH
 prepareNecessitasQt
-#prepareNecessitasQtTools windows
+prepareNecessitasQtTools windows
 #prepareNecessitasQtTools macosx
 
 # TODO :: Fix webkit build in Windows (-no-video fails) and Mac OS X (debug-and-release config incorrectly used and fails)
@@ -1976,7 +1991,7 @@ popd
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     for CROSS_HOST in msys darwin ; do
-        set_host_ostype $CROSS_HOST
+        Set_HOST_OSTYPE $CROSS_HOST
         if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
             makeInstallMinGWLibs
         fi
