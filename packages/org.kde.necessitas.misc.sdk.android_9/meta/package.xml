@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <Package>
-    <DisplayName>API 9 (depercated)</DisplayName>
+    <DisplayName>API 9 (deprecated)</DisplayName>
     <Description>Android 2.3, 2.3.1, 2.3.2 Gingerbread SDK API 9 (@@ANDROID_API_9_VERSION@@) Depercated !</Description>
     <Version>@@ANDROID_API_9_VERSION@@</Version>
     <ReleaseDate>@@TODAY@@</ReleaseDate>
