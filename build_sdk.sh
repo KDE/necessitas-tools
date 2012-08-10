@@ -49,7 +49,7 @@ TODAY=`date +%Y-%m-%d`
 if [ "$OSTYPE_MAJOR" = "msys" ] ; then
     TEMP_PATH=/usr/nec
 else
-    TEMP_PATH=/var/tmp/necessitas
+    TEMP_PATH=/tmp/necessitas
 fi
 
 if [ "$OSTYPE_MAJOR" = "darwin" ]; then
@@ -1974,6 +1974,8 @@ prepareNecessitasQtTools windows
 prepareNecessitasQtMobility
 popd
 
+prepareSDKBinary
+
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
 #    for CROSS_HOST in msys darwin ; do
     for CROSS_HOST in msys ; do
@@ -1984,12 +1986,12 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
         prepareHostQt
         prepareSdkInstallerTools
         prepareNecessitasQtCreator
+        prepareSDKBinary
     done
 fi
 
 #prepareWindowsPackages
 setPackagesVariables
-prepareSDKBinary
 
 # Comment this block in if you want necessitas-sdk-installer-d and qtcreator-d to be built.
 if [ "$MAKE_DEBUG_HOST_APPS" = "1" ] ; then
