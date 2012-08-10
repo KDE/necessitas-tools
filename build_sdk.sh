@@ -68,6 +68,8 @@ fi
 
 . sdk_cleanup.sh
 
+export PATH=$PATH:${TEMP_PATH}/host_compiler_tools/mingw/i686-w64-mingw32/bin
+
 # Global just because 2 functions use them, only acceptable values for GDB_VER are 7.2 and 7.3
 GDB_VER=7.3
 #GDB_VER=7.2
@@ -123,7 +125,6 @@ function Set_HOST_OSTYPE
         HOST_QM_CFG_OPTIONS="CONFIG+=ms_bitfields CONFIG+=static_gcclibs"
         HOST_TAG=windows
         HOST_TAG_NDK=windows
-        EXE_EXT=.exe
         SHLIB_EXT=.dll
         SCRIPT_EXT=.bat
     elif [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
@@ -455,7 +456,7 @@ function prepareNecessitasQtCreator
             cp -a /mingw/bin/libgcc_s_sjlj-1.dll $QTC_INST_PATH/bin/
             cp -a /mingw/bin/libstdc++-6.dll $QTC_INST_PATH/bin/
             QT_LIB_DEST=$QTC_INST_PATH/bin/
-            cp -a $SHARED_QT_PATH/lib/* $QT_LIB_DEST
+            cp -a $SHARED_QT_PATH/lib/*.dll $QT_LIB_DEST
             cp -a bin/necessitas.bat $QTC_INST_PATH/bin/
 # Want to re-enable this, but libintl-8.dll is getting used.
 #            git clone git://gitorious.org/mingw-android-various/mingw-android-various.git android-various
@@ -1308,48 +1309,34 @@ function compileNecessitasHostQtTools #params $1 architecture, $2 package path, 
     if [ ! -z $4 ] ; then
         ANDROID_ARCH=$4
     fi
-    NQT_INSTALL_DIR=$PWD/install
 
-    if [ "$OSTYPE" = "linux-gnu" ] ; then
-        if [ ! -d android-sdk-linux/platform-tools ]
-        then
-            rm -fr android-sdk-linux
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.base/data/android-sdk-linux.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.platform_tools/data/platform-tools_${ANDROID_PLATFORM_TOOLS_VERSION}-linux.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_14/data/android-${ANDROID_API_14_VERSION}.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_8/data/android-${ANDROID_API_8_VERSION}.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_7/data/android-${ANDROID_API_7_VERSION}.7z
-            7z -y x $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.android_4/data/android-${ANDROID_API_4_VERSION}-linux.7z
-        fi
-        export ANDROID_SDK_TOOLS_PATH=$PWD/android-sdk/tools/
-        export ANDROID_SDK_PLATFORM_TOOLS_PATH=$PWD/android-sdk/platform-tools/
-    fi
-
+    # the install path should be the same with the one where the libs were built
+    NQT_INSTALL_DIR=$TEMP_PATH/$CHECKOUT_BRANCH/Android/Qt/$NECESSITAS_QT_VERSION_SHORT/build-$1/install
+    OLD_PATH=$PATH
+    export PATH=$NQT_INSTALL_DIR/bin:$PATH
     if [ ! -f all_done ]
     then
          pushd ../qt-src
          git checkout -f mkspecs
          popd
-        ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 1 -q 1 -n $TEMP_PATH/android-ndk -a $ANDROID_ARCH -k 0 -i $NQT_INSTALL_DIR || error_msg "Can't configure android-qt"
+        ../qt-src/configure -opensource -confirm-license -v -platform linux-mingw-w64-32-g++ -no-webkit -no-script -no-declarative -no-qt3support -no-xmlpatterns -no-phonon -no-svg -no-scripttools -nomake demos -no-multimedia -nomake examples -little-endian -host-little-endian -fast -cross-qmake qmake --prefix=$NQT_INSTALL_DIR --enable-BUILD_ON_MSYS || error_msg "Can't configure android-qt"
         echo "all done">all_done
     fi
 
     rm -fr install
     rm -fr Android
-    unset INSTALL_ROOT
-    make QtJar
-    ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 0 -q 0 -n $TEMP_PATH/android-ndk -a $ANDROID_ARCH -b 0 -k 1 -i $NQT_INSTALL_DIR || error_msg "Can't install android-qt"
+
+    export INSTALL_ROOT=$PWD/install
+    make sub-qmake-install sub-tools-bootstrap sub-moc-install_subtargets sub-rcc-install_subtargets sub-uic-install_subtargets sub-tools-install_subtargets || error_msg "Can't install android-qt"
 
     mkdir -p $2/$1
-    cp -rf $NQT_INSTALL_DIR/bin $2/$1
-    createArchive Android qt-tools-${HOST_TAG}.7z
+    cp -rf $INSTALL_ROOT/$NQT_INSTALL_DIR/bin $2/$1
+    createArchive Android qt-tools-${XHOST_TAG}.7z
     rm -fr $2/$1/bin
+
     mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.$package_name/data
-    mv qt-tools-${HOST_TAG}.7z $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.$package_name/data/qt-tools-${HOST_TAG}.7z
-    cp -rf $NQT_INSTALL_DIR/* $2/$1
-    cp -rf ../qt-src/lib/*.xml $2/$1/lib/
-    cp -rf jar $2/$1/
-    rm -fr $2/$1/bin
+    mv qt-tools-${XHOST_TAG}.7z $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.$package_name/data/qt-tools-${XHOST_TAG}.7z
+    export PATH=$OLD_PATH
 }
 
 function prepareNecessitasQt
@@ -1380,13 +1367,13 @@ function prepareNecessitasQt
         popd #build-armeabi-v7a
     fi
 
-#    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.armeabi_android_4/data/qt-tools-${HOST_TAG}.7z ]
-#    then
-#        mkdir build-armeabi-android-4
-#        pushd build-armeabi-android-4
-#        compileNecessitasQt armeabi-android-4 Android/Qt/$NECESSITAS_QT_VERSION_SHORT 4 armeabi
-#        popd #build-armeabi_android_4
-#    fi
+    if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.armeabi_android_4/data/qt-tools-${HOST_TAG}.7z ]
+    then
+        mkdir build-armeabi-android-4
+        pushd build-armeabi-android-4
+        compileNecessitasQt armeabi-android-4 Android/Qt/$NECESSITAS_QT_VERSION_SHORT 4 armeabi
+        popd #build-armeabi_android_4
+    fi
 
 # Enable it when QtCreator is ready
 #     if [ ! -f $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.x86/data/qt-tools-${HOST_TAG}.7z ]
@@ -1407,7 +1394,7 @@ function prepareNecessitasQt
 
 function prepareNecessitasQtTools
 {
-    local XHOST_TAG=$1
+    XHOST_TAG=$1
     mkdir -p Android/Qt/$NECESSITAS_QT_VERSION_SHORT
     pushd Android/Qt/$NECESSITAS_QT_VERSION_SHORT
 
@@ -1441,7 +1428,7 @@ function prepareNecessitasQtTools
         compileNecessitasHostQtTools armeabi-android-4 Android/Qt/$NECESSITAS_QT_VERSION_SHORT 4 armeabi
         popd #build-armeabi_android_4-${XHOST_TAG}
     fi
-
+    popd
 }
 
 function compileNecessitasQtMobility
@@ -1785,13 +1772,13 @@ function prepareSDKBinary
     rm -fr *.7z
     if [ "$OSTYPE_MAJOR" = "msys" ] ; then
         mkdir temp
-        cp -a $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$EXE_EXT temp/SDKMaintenanceToolBase.exe
+        cp -a $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG.exe temp/SDKMaintenanceToolBase.exe
         createArchive temp sdkmaintenance-windows.7z
     else
         if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
             cp -a $REPO_SRC_PATH/necessitas-sdk-installer${HOST_QT_CONFIG}.app .tempSDKMaintenanceTool
         else
-            cp -a $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$EXE_EXT .tempSDKMaintenanceTool
+            cp -a $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG .tempSDKMaintenanceTool
         fi
 
         if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
@@ -1976,6 +1963,7 @@ mkdir $CHECKOUT_BRANCH
 pushd $CHECKOUT_BRANCH
 prepareNecessitasQt
 prepareNecessitasQtTools windows
+
 #prepareNecessitasQtTools macosx
 
 # TODO :: Fix webkit build in Windows (-no-video fails) and Mac OS X (debug-and-release config incorrectly used and fails)
@@ -1983,14 +1971,12 @@ prepareNecessitasQtTools windows
 # Webkit is broken currently.
 # prepareNecessitasQtWebkit
 
-#if [ "$OSTYPE_MAJOR" != "msys" ] ; then
-#    prepareNecessitasQtMobility # if [[ `gcc --version` =~ .*llvm.* ]]; => syntax error near `=~'
-#fi
-
+prepareNecessitasQtMobility
 popd
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
-    for CROSS_HOST in msys darwin ; do
+#    for CROSS_HOST in msys darwin ; do
+    for CROSS_HOST in msys ; do
         Set_HOST_OSTYPE $CROSS_HOST
         if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
             makeInstallMinGWLibs
@@ -1998,7 +1984,6 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
         prepareHostQt
         prepareSdkInstallerTools
         prepareNecessitasQtCreator
-        # TODO :: write prepareSDKHostTools (qmake, moc, uic, rcc, lrelease) for each platform.
     done
 fi
 
