@@ -1209,7 +1209,7 @@ function packSource
     echo cp -rf $1 $TEMP_PATH/source_temp_path/Android/Qt/$NECESSITAS_QT_VERSION_SHORT/
     cp -rf $1 $TEMP_PATH/source_temp_path/Android/Qt/$NECESSITAS_QT_VERSION_SHORT/
     pushd $TEMP_PATH/source_temp_path
-    createArchive Android $1.7z -l
+    createArchive Android $1.7z $EXTERNAL_7Z_A_PARAMS_WIN
     mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.android.$package_name/data
     mv $1.7z $REPO_PATH_PACKAGES/org.kde.necessitas.android.$package_name/data/$1.7z
     popd
