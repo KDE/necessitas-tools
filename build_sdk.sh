@@ -112,8 +112,8 @@ function Set_HOST_OSTYPE
     HOST_OSTYPE_MAJOR=$1
     HOST_STRIP=strip
     if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
-        HOST_QT_GIT_URL=https://git.gitorious.org/~mingwandroid/qt/mingw-android-official-qt.git
-        HOST_QT_BRANCH="remotes/origin/4.8"
+        HOST_QT_GIT_URL=git://anongit.kde.org/android-qt.git
+        HOST_QT_BRANCH="remotes/origin/ports-win"
         HOST_CFG_OPTIONS=" -reduce-exports -ms-bitfields -no-freetype -no-fontconfig -prefix . -little-endian -host-little-endian -fast " # "-little-endian -host-little-endian -fast" came from BogDan's cross.diff email.
         if [ $OSTYPE_MAJOR = "msys" ] ; then
             HOST_CFG_PLATFORM="win32-g++"
