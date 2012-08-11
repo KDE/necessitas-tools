@@ -21,7 +21,7 @@ DATESUFFIX=$(date +%y%m%d)
 if [ "$OSTYPE_MAJOR" = "msys" ] ; then
     BUILD_DIR=/usr/nec
 else
-    BUILD_DIR=/var/tmp/necessitas
+    BUILD_DIR=/tmp/necessitas
 fi
 BUILD_DIR_TMP=$BUILD_DIR/ndk-build
 HOST_TOOLS=$BUILD_DIR/host_compiler_tools
@@ -69,7 +69,7 @@ fi
 
 case $OSTYPE_MAJOR in
     linux*)
-        SYSTEMS=linux-x86,windows-x86,darwin-x86
+        SYSTEMS=linux-x86,windows-x86
         NUM_CORES=$(grep -c -e '^processor' /proc/cpuinfo)
         BUILD_OS="linux"
         ;;
