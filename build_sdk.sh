@@ -467,7 +467,10 @@ function prepareNecessitasQtCreator
 #            ../make-3.82/build-mingw.sh
 #            popd
 #            cp android-various/make-3.82-build/make.exe $QTC_INST_PATH/bin/
-            cp /usr/local/bin/ma-make.exe $QTC_INST_PATH/bin/make.exe
+            pushd $QTC_INST_PATH/bin/
+            downloadIfNotExists make.exe http://mingw-and-ndk.googlecode.com/files/make.exe
+            mv make.exe ma-make.exe
+            popd
         elif [ "$HOST_OSTYPE_MAJOR" = "linux-gnu" ]; then
             mkdir -p $QTC_INST_PATH/Qt/imports
             mkdir -p $QTC_INST_PATH/Qt/plugins
