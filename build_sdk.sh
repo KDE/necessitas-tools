@@ -112,7 +112,8 @@ function Set_HOST_OSTYPE
     HOST_OSTYPE_MAJOR=$1
     HOST_STRIP=strip
     if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
-        HOST_QT_BRANCH="remotes/origin/ports"
+        HOST_QT_GIT_URL=https://git.gitorious.org/~mingwandroid/qt/mingw-android-official-qt.git
+        HOST_QT_BRANCH="remotes/origin/4.8"
         HOST_CFG_OPTIONS=" -reduce-exports -ms-bitfields -no-freetype -no-fontconfig -prefix . -little-endian -host-little-endian -fast " # "-little-endian -host-little-endian -fast" came from BogDan's cross.diff email.
         if [ $OSTYPE_MAJOR = "msys" ] ; then
             HOST_CFG_PLATFORM="win32-g++"
@@ -128,6 +129,7 @@ function Set_HOST_OSTYPE
         SHLIB_EXT=.dll
         SCRIPT_EXT=.bat
     elif [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
+        HOST_QT_GIT_URL=git://anongit.kde.org/android-qt.git
         HOST_QT_BRANCH="remotes/origin/ports"
         if [ $OSTYPE_MAJOR = "darwin" ] ; then
             HOST_CFG_PLATFORM="macx-g++"
@@ -149,6 +151,7 @@ function Set_HOST_OSTYPE
             HOST_STRIP="i686-apple-darwin11-strip"
         fi
     else
+        HOST_QT_GIT_URL=git://anongit.kde.org/android-qt.git
         HOST_QT_BRANCH="remotes/upstream/tags/v4.7.4"
         HOST_CFG_OPTIONS="-arch i386"
         HOST_CFG_PLATFORM="linux-g++"
@@ -291,15 +294,12 @@ function prepareHostQt
     HOST_QT_CONFIG=$1
 
     THIS_QT_BRANCH=$HOST_QT_BRANCH
-    export QT_SRCDIR=$PWD/qt-src
-    # If cross compiling...
-    if [ "$HOST_OSTYPE_MAJOR" = "msys" -o "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
-        export QT_SRCDIR=$PWD/qt-src-ports
-    fi
+    THIS_QT_BRANCH_NAME=$(basename $THIS_QT_BRANCH)
+    export QT_SRCDIR=$PWD/qt-src-${THIS_QT_BRANCH_NAME}
 
     if [ ! -d $(basename $QT_SRCDIR) ]
     then
-        git clone git://anongit.kde.org/android-qt.git $(basename $QT_SRCDIR) || error_msg "Can't clone ${1}"
+        git clone ${HOST_QT_GIT_URL} $(basename $QT_SRCDIR) || error_msg "Can't clone ${1}"
         pushd $(basename $QT_SRCDIR)
         git config --add remote.origin.fetch +refs/upstream/*:refs/remotes/upstream/*
         git fetch
@@ -319,8 +319,8 @@ function prepareHostQt
         HOST_QT_CFG="CONFIG+=release QT+=network"
     fi
 
-    STATIC_PREFIX=static-build
-    SHARED_PREFIX=shared-build
+    STATIC_PREFIX=static-build-${THIS_QT_BRANCH_NAME}
+    SHARED_PREFIX=shared-build-${THIS_QT_BRANCH_NAME}
     if [ ! "$HOST_OSTYPE_MAJOR" = "$OSTYPE_MAJOR" ] ; then
         STATIC_PREFIX=$STATIC_PREFIX-$HOST_OSTYPE_MAJOR
         SHARED_PREFIX=$SHARED_PREFIX-$HOST_OSTYPE_MAJOR
@@ -340,7 +340,7 @@ function prepareHostQt
     if [ ! -f all_done ]
     then
         pushd $QT_SRCDIR
-        git checkout -b $(basename $THIS_QT_BRANCH) $THIS_QT_BRANCH
+        git checkout -b $THIS_QT_BRANCH_NAME $THIS_QT_BRANCH
         git pull
         popd
         rm -fr *
@@ -360,7 +360,7 @@ function prepareHostQt
     if [ ! -f all_done ]
     then
         pushd $QT_SRCDIR
-        git checkout $THIS_QT_BRANCH
+        git checkout -b $THIS_QT_BRANCH_NAME $THIS_QT_BRANCH
         git pull
         popd
         rm -fr *
@@ -376,13 +376,15 @@ function prepareHostQt
 
 function prepareSdkInstallerTools
 {
-    # get installer source code
-    SDK_TOOLS_PATH=$PWD/necessitas-installer-framework/installerbuilder/bin
-
     if [ "$HOST_OSTYPE_MAJOR" = "msys" -o "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
         QTINST_PATH=necessitas-installer-framework-${HOST_TAG}${HOST_QT_CONFIG}
     else
         QTINST_PATH=necessitas-installer-framework
+    fi
+
+    # get installer source code
+    if [ "$HOST_OSTYPE_MAJOR" = "$HOST_OSTYPE" ] ; then
+        SDK_TOOLS_PATH=$PWD/necessitas-installer-framework/installerbuilder/bin
     fi
 
     if [ ! -d $QTINST_PATH ]
@@ -399,7 +401,7 @@ function prepareSdkInstallerTools
         doMake "Can't compile $QTINST_PATH" "all done" ma-make
     fi
     popd
-    pushd $SDK_TOOLS_PATH
+    pushd ${PWD}/${QTINST_PATH}/installerbuilder/bin
     if [ -z $HOST_QT_CONFIG ] ; then
         $HOST_STRIP *
     fi
@@ -1977,6 +1979,7 @@ popd
 prepareSDKBinary
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
+# TODO :: Get darwin cross working.
 #    for CROSS_HOST in msys darwin ; do
     for CROSS_HOST in msys ; do
         Set_HOST_OSTYPE $CROSS_HOST
