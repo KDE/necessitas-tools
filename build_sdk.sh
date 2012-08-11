@@ -376,16 +376,14 @@ function prepareHostQt
 
 function prepareSdkInstallerTools
 {
-    if [ "$HOST_OSTYPE_MAJOR" = "msys" -o "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
-        QTINST_PATH=necessitas-installer-framework-${HOST_TAG}${HOST_QT_CONFIG}
-    else
-        QTINST_PATH=necessitas-installer-framework
-    fi
-
     # get installer source code
     if [ "$HOST_OSTYPE_MAJOR" = "$HOST_OSTYPE" ] ; then
-        SDK_TOOLS_PATH=$PWD/necessitas-installer-framework/installerbuilder/bin
+        QTINST_PATH=necessitas-installer-framework
+    else
+        QTINST_PATH=necessitas-installer-framework-${HOST_TAG}${HOST_QT_CONFIG}
     fi
+
+    SDK_TOOLS_PATH=${PWD}/${QTINST_PATH}/installerbuilder/bin
 
     if [ ! -d $QTINST_PATH ]
     then
