@@ -182,7 +182,7 @@ function createArchive # params $1 folder, $2 archive name, $3 extra params
         fi
         $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS $EXTRA_PARAMS $3 $2 "$1" || error_msg "Can't create archive $EXTERNAL_7Z $EXTERNAL_7Z_A_PARAMS $EXTRA_PARAMS $3 $2 $1"
     else
-        $SDK_TOOLS_PATH/archivegen "$1" $2
+        $HOST_SDK_TOOLS_PATH/archivegen "$1" $2
     fi
 }
 
@@ -379,13 +379,13 @@ function prepareHostQt
 function prepareSdkInstallerTools
 {
     # get installer source code
-    if [ "$HOST_OSTYPE_MAJOR" = "$HOST_OSTYPE" ] ; then
-        QTINST_PATH=necessitas-installer-framework
-    else
-        QTINST_PATH=necessitas-installer-framework-${HOST_TAG}${HOST_QT_CONFIG}
-    fi
-
+    QTINST_PATH=necessitas-installer-framework-${HOST_TAG}${HOST_QT_CONFIG}
     SDK_TOOLS_PATH=${PWD}/${QTINST_PATH}/installerbuilder/bin
+
+    if [ "$HOST_OSTYPE_MAJOR" = "$OSTYPE_MAJOR" ] ; then
+        HOST_QTINST_PATH=necessitas-installer-framework-${HOST_TAG}${HOST_QT_CONFIG}
+        HOST_SDK_TOOLS_PATH=${PWD}/${QTINST_PATH}/installerbuilder/bin
+    fi
 
     if [ ! -d $QTINST_PATH ]
     then
@@ -1775,30 +1775,31 @@ function setPackagesVariables
 
 function prepareSDKBinary
 {
-    $SDK_TOOLS_PATH/binarycreator -v -t $SDK_TOOLS_PATH/installerbase$HOST_EXE_EXT -c $REPO_SRC_PATH/config -p $REPO_PATH_PACKAGES -n $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$HOST_EXE_EXT org.kde.necessitas
+    $HOST_SDK_TOOLS_PATH/binarycreator -v -t $SDK_TOOLS_PATH/installerbase$HOST_EXE_EXT -c $REPO_SRC_PATH/config -p $REPO_PATH_PACKAGES -n $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$HOST_EXE_EXT org.kde.necessitas
     # Work around mac bug. qt_menu.nib doesn't get copied to the build, nor to the app.
     # https://bugreports.qt.nokia.com//browse/QTBUG-5952
-    if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+    if [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
         pushd $REPO_SRC_PATH
         $SHARED_QT_PATH/bin/macdeployqt necessitas-sdk-installer$HOST_QT_CONFIG.app
         popd
         cp -rf $QT_SRCDIR/src/gui/mac/qt_menu.nib $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG.app/Contents/Resources/
     fi
+    rm -fr sdkmaintenance
     mkdir sdkmaintenance
     pushd sdkmaintenance
     rm -fr *.7z
-    if [ "$OSTYPE_MAJOR" = "msys" ] ; then
+    if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
         mkdir temp
         cp -a $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG.exe temp/SDKMaintenanceToolBase.exe
         createArchive temp sdkmaintenance-windows.7z
     else
-        if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
+        if [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
             cp -a $REPO_SRC_PATH/necessitas-sdk-installer${HOST_QT_CONFIG}.app .tempSDKMaintenanceTool
         else
             cp -a $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG .tempSDKMaintenanceTool
         fi
 
-        if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
+        if [ "$HOST_OSTYPE_MAJOR" = "linux-gnu" ] ; then
                 createArchive . sdkmaintenance-linux-x86.7z
         else
                 createArchive . sdkmaintenance-darwin-x86.7z
@@ -1812,7 +1813,7 @@ function prepareSDKBinary
 function prepareSDKRepository
 {
     rm -fr $REPO_PATH
-    $SDK_TOOLS_PATH/repogen -v  -p $REPO_PATH_PACKAGES -c $REPO_SRC_PATH/config -u http://files.kde.org/necessitas/test $REPO_PATH
+    $HOST_SDK_TOOLS_PATH/repogen -v  -p $REPO_PATH_PACKAGES -c $REPO_SRC_PATH/config -u http://files.kde.org/necessitas/test $REPO_PATH
 }
 
 function prepareMinistroRepository
@@ -1997,7 +1998,7 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
 # TODO :: Get darwin cross working.
 #    for CROSS_HOST in msys darwin ; do
     for CROSS_HOST in msys ; do
-        Set_HOST_OSTYPE $CROSS_HOST
+        Set_HOST_OSTYPE "$CROSS_HOST"
         if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
             makeInstallMinGWLibs
         fi
@@ -2007,7 +2008,7 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
         prepareSDKBinary
     done
 fi
-
+Set_HOST_OSTYPE "$OSTYPE"
 #prepareWindowsPackages
 setPackagesVariables
 
