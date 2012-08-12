@@ -1315,6 +1315,15 @@ function compileNecessitasHostQtTools #params $1 architecture, $2 package path, 
         ANDROID_ARCH=$4
     fi
 
+    if [ ! $(which qmake) ] ; then
+        (pushd /tmp ; $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.armeabi/data/qt-tools-linux-x86.7z)
+        export PATH=/tmp/Android/Qt/${NECESSITAS_QT_VERSION_SHORT}/armeabi/bin:$PATH
+    fi
+    if [ ! $(which qmake) ] ; then
+        echo "No build qmake found?"
+        exit 1
+    fi
+
     # the install path should be the same with the one where the libs were built
     NQT_INSTALL_DIR=$TEMP_PATH/$CHECKOUT_BRANCH/Android/Qt/$NECESSITAS_QT_VERSION_SHORT/build-$1/install
     OLD_PATH=$PATH
