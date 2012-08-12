@@ -490,12 +490,15 @@ function prepareNecessitasQtCreator
         if [ -z $HOST_QT_CONFIG ] ; then
             find . -name "*$SHLIB_EXT" | xargs $HOST_STRIP
         fi
+        find . -name "*.a" | xargs rm -fr
+        find . -name "*.prl" | xargs rm -fr
+        rm -fr bin/pkgconfig
         popd
-            pushd $(dirname "$QTC_INST_PATH")
-            createArchive "$QTC_INST_DIRNAME" qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z
-            mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.tools.qtcreator/data
-            mv qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z $REPO_PATH_PACKAGES/org.kde.necessitas.tools.qtcreator/data/qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z
-            popd
+        pushd $(dirname "$QTC_INST_PATH")
+        createArchive "$QTC_INST_DIRNAME" qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z
+        mkdir -p $REPO_PATH_PACKAGES/org.kde.necessitas.tools.qtcreator/data
+        mv qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z $REPO_PATH_PACKAGES/org.kde.necessitas.tools.qtcreator/data/qtcreator-${HOST_TAG}${HOST_QT_CONFIG}.7z
+        popd
         popd
     fi
 }
