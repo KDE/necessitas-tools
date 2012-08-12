@@ -111,6 +111,7 @@ function Set_HOST_OSTYPE
 {
     HOST_OSTYPE_MAJOR=$1
     HOST_STRIP=strip
+    HOST_EXE_EXT=
     if [ "$HOST_OSTYPE_MAJOR" = "msys" ] ; then
         HOST_QT_GIT_URL=git://anongit.kde.org/android-qt.git
         HOST_QT_BRANCH="remotes/origin/ports-win"
@@ -128,6 +129,7 @@ function Set_HOST_OSTYPE
         HOST_TAG_NDK=windows
         SHLIB_EXT=.dll
         SCRIPT_EXT=.bat
+        HOST_EXE_EXT=.exe
     elif [ "$HOST_OSTYPE_MAJOR" = "darwin" ] ; then
         HOST_QT_GIT_URL=git://anongit.kde.org/android-qt.git
         HOST_QT_BRANCH="remotes/origin/ports"
@@ -1761,7 +1763,7 @@ function setPackagesVariables
 
 function prepareSDKBinary
 {
-    $SDK_TOOLS_PATH/binarycreator -v -t $SDK_TOOLS_PATH/installerbase$EXE_EXT -c $REPO_SRC_PATH/config -p $REPO_PATH_PACKAGES -n $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$EXE_EXT org.kde.necessitas
+    $SDK_TOOLS_PATH/binarycreator -v -t $SDK_TOOLS_PATH/installerbase$HOST_EXE_EXT -c $REPO_SRC_PATH/config -p $REPO_PATH_PACKAGES -n $REPO_SRC_PATH/necessitas-sdk-installer$HOST_QT_CONFIG$HOST_EXE_EXT org.kde.necessitas
     # Work around mac bug. qt_menu.nib doesn't get copied to the build, nor to the app.
     # https://bugreports.qt.nokia.com//browse/QTBUG-5952
     if [ "$OSTYPE_MAJOR" = "darwin" ] ; then
