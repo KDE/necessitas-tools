@@ -135,7 +135,19 @@ function Set_HOST_OSTYPE
         HOST_QT_BRANCH="remotes/origin/ports"
         if [ $OSTYPE_MAJOR = "darwin" ] ; then
             HOST_CFG_PLATFORM="macx-g++"
-            HOST_CFG_OPTIONS=" -little-endian -sdk /Developer/SDKs/MacOSX10.6.sdk -arch i386 -arch x86_64 -cocoa -prefix . "
+            if [ -d /Applications/Xcode.app/Contents//Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk ] ; then
+                MACOSX_SDK=/Applications/Xcode.app/Contents//Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk
+            elif [ -d /Applications/Xcode.app/Contents//Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk ] ; then
+                MACOSX_SDK=/Applications/Xcode.app/Contents//Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk
+            elif [ -d /Developer/SDKs/MacOSX10.6.sdk ] ; then
+                MACOSX_SDK=/Developer/SDKs/MacOSX10.6.sdk
+            elif [ -d /Developer/SDKs/MacOSX10.7.sdk ] ; then
+                MACOSX_SDK=/Developer/SDKs/MacOSX10.7.sdk
+            else
+                echo "Failed to find MacOSX10.6.sdk or MacOSX10.7.sdk"
+                exit 1
+            fi
+            HOST_CFG_OPTIONS=" -little-endian -sdk $MACOSX_SDK -arch i386 -arch x86_64 -cocoa -prefix . "
         else
             HOST_CFG_PLATFORM="macx-g++-cross"
             export PATH=${TEMP_PATH}/host_compiler_tools/darwin/apple-osx/bin:$PATH
@@ -1980,7 +1992,7 @@ prepareNecessitasQtCreator
 mkdir $CHECKOUT_BRANCH
 pushd $CHECKOUT_BRANCH
 prepareNecessitasQt
-prepareNecessitasQtTools windows
+#prepareNecessitasQtTools windows
 
 #prepareNecessitasQtTools macosx
 
