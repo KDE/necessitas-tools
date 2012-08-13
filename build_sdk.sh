@@ -1330,6 +1330,11 @@ function compileNecessitasHostQtTools #params $1 architecture, $2 package path, 
         ANDROID_ARCH=$4
     fi
 
+    # the install path should be the same with the one where the libs were built
+    NQT_INSTALL_DIR=$TEMP_PATH/$CHECKOUT_BRANCH/Android/Qt/$NECESSITAS_QT_VERSION_SHORT/build-$1/install
+    OLD_PATH=$PATH
+    export PATH=$NQT_INSTALL_DIR/bin:$PATH
+
     if [ ! $(which qmake) ] ; then
         (pushd /tmp ; $EXTERNAL_7Z $EXTERNAL_7Z_X_PARAMS $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.armeabi/data/qt-tools-linux-x86.7z)
         export PATH=/tmp/Android/Qt/${NECESSITAS_QT_VERSION_SHORT}/armeabi/bin:$PATH
@@ -1339,10 +1344,6 @@ function compileNecessitasHostQtTools #params $1 architecture, $2 package path, 
         exit 1
     fi
 
-    # the install path should be the same with the one where the libs were built
-    NQT_INSTALL_DIR=$TEMP_PATH/$CHECKOUT_BRANCH/Android/Qt/$NECESSITAS_QT_VERSION_SHORT/build-$1/install
-    OLD_PATH=$PATH
-    export PATH=$NQT_INSTALL_DIR/bin:$PATH
     if [ ! -f all_done ]
     then
          pushd ../qt-src
@@ -1992,9 +1993,11 @@ prepareNecessitasQtCreator
 mkdir $CHECKOUT_BRANCH
 pushd $CHECKOUT_BRANCH
 prepareNecessitasQt
-#prepareNecessitasQtTools windows
 
-#prepareNecessitasQtTools macosx
+if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
+    prepareNecessitasQtTools windows
+    #prepareNecessitasQtTools macosx
+fi
 
 # TODO :: Fix webkit build in Windows (-no-video fails) and Mac OS X (debug-and-release config incorrectly used and fails)
 # git clone often fails for webkit
