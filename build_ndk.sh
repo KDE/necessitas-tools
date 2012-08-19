@@ -28,8 +28,8 @@ HOST_TOOLS=$BUILD_DIR/host_compiler_tools
 GCC_VER_LINARO=4.6-2012.07
 GCC_VER_LINARO_MAJOR=4.6
 GCC_VER_LINARO_LOCAL=4.6.3
-ARCHES="arm,mips,x86"
-#ARCHES="arm"
+#ARCHES="arm,mips,x86"
+ARCHES="arm"
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
@@ -69,7 +69,8 @@ fi
 
 case $OSTYPE_MAJOR in
     linux*)
-        SYSTEMS=linux-x86,windows-x86
+#        SYSTEMS=linux-x86,windows-x86
+        SYSTEMS=linux-x86
         NUM_CORES=$(grep -c -e '^processor' /proc/cpuinfo)
         BUILD_OS="linux"
         ;;
@@ -526,7 +527,6 @@ PACKAGE_DIR=$PWD/release-$DATESUFFIX
 
 mkdir -p $PACKAGE_DIR
 
-if [ "0" = "1" ] ; then
 $NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
   --gmp-version=5.0.5 \
   --force-gold-build \
@@ -553,7 +553,6 @@ $NDK/build/tools/build-host-python.sh --toolchain-src-dir=$TC_SRC_DIR \
    -j$JOBS
 
 fail_panic "build-host-python.sh failed"
-fi
 
 $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
   --systems="$SYSTEMS" \
