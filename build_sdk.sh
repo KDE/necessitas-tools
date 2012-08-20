@@ -1281,8 +1281,8 @@ function compileNecessitasQt #params $1 architecture, $2 package path, $3 NDK_TA
     rm -fr install
     rm -fr Android
     unset INSTALL_ROOT
-    make QtJar
     ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 0 -q 0 -n $TEMP_PATH/android-ndk -a $ANDROID_ARCH -b 0 -k 1 -i $NQT_INSTALL_DIR || error_msg "Can't install android-qt"
+    cp -f lib/libgnustl_shared.so $NQT_INSTALL_DIR/lib/
 
     mkdir -p $2/$1
     cp -rf $NQT_INSTALL_DIR/bin $2/$1
@@ -1292,6 +1292,7 @@ function compileNecessitasQt #params $1 architecture, $2 package path, $3 NDK_TA
     mv qt-tools-${HOST_TAG}.7z $REPO_PATH_PACKAGES/org.kde.necessitas.android.qt.$package_name/data/qt-tools-${HOST_TAG}.7z
     cp -rf $NQT_INSTALL_DIR/* $2/$1
     cp -rf ../qt-src/lib/*.xml $2/$1/lib/
+    cp -f lib/libgnustl_shared.so $2/$1/lib/
     cp -rf jar $2/$1/
     rm -fr $2/$1/bin
 
@@ -2039,5 +2040,4 @@ removeUnusedPackages
 
 prepareSDKRepository
 prepareMinistroRepository
-
 popd
