@@ -68,10 +68,10 @@ registerWindowsFileTypeExtensions = function()
     for (var i = 0; i < headerExtensions.length; ++i) {
         component.addOperation( "RegisterFileType",
                                 headerExtensions[i],
-                                "@TargetDir@\\QtCreator\\bin\\qtcreator.exe -client '%1'",
+                                "@TargetDir@\\QtCreator\\bin\\necessitas.bat -client '%1'",
                                 "C++ Header file",
                                 "",
-                                "@TargetDir@\\QtCreator\\bin\\qtcreator.exe,3");
+                                "@TargetDir@\\QtCreator\\bin\\necessitas.bat,3");
     }
 
     var cppExtensions = new Array("cc", "cxx", "c++", "cp", "cpp");
@@ -79,48 +79,48 @@ registerWindowsFileTypeExtensions = function()
     for (var i = 0; i < cppExtensions.length; ++i) {
         component.addOperation( "RegisterFileType",
                                 cppExtensions[i],
-                                "@TargetDir@\\QtCreator\\bin\\qtcreator.exe -client '%1'",
+                                "@TargetDir@\\QtCreator\\bin\\necessitas.bat -client '%1'",
                                 "C++ Source file",
                                 "",
-                                "@TargetDir@\\QtCreator\\bin\\qtcreator.exe,2");
+                                "@TargetDir@\\QtCreator\\bin\\necessitas.bat,2");
     }
 
     component.addOperation( "RegisterFileType",
                             "c",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe -client '%1'",
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat -client '%1'",
                             "C Source file",
                             "",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe,1");
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat,1");
     component.addOperation( "RegisterFileType",
                             "ui",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe -client '%1'",
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat -client '%1'",
                             "Qt UI file",
                             "",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe,4");
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat,4");
     component.addOperation( "RegisterFileType",
                             "pro",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe -client '%1'",
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat -client '%1'",
                             "Qt Project file",
                             "",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe,5");
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat,5");
     component.addOperation( "RegisterFileType",
                             "pri",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe -client '%1'",
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat -client '%1'",
                             "Qt Project Include file",
                             "",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe,6");
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat,6");
     component.addOperation( "RegisterFileType",
                             "qs",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe -client '%1'",
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat -client '%1'",
                             "Qt Script file",
                             "",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe,0");
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat,0");
     component.addOperation( "RegisterFileType",
                             "qml",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe -client '%1'",
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat -client '%1'",
                             "Qt Quick Markup language file",
                             "",
-                            "@TargetDir@\\QtCreator\\bin\\qtcreator.exe,0");
+                            "@TargetDir@\\QtCreator\\bin\\necessitas.bat,0");
 }
 
 Component.prototype.createOperations = function()
@@ -136,7 +136,7 @@ Component.prototype.createOperations = function()
                                 "@TargetDir@/QtCreator/bin",
                                 "@TargetDir@/QtCreator/bin");
         component.addOperation( "CreateShortcut",
-                                "@TargetDir@\\QtCreator\\bin\\qtcreator.exe",
+                                "@TargetDir@\\QtCreator\\bin\\necessitas.bat",
                                 "@StartMenuDir@/Qt Creator.lnk",
                                 "workingDirectory=@homeDir@" );
         registerWindowsFileTypeExtensions();
@@ -160,7 +160,7 @@ Component.prototype.createOperations = function()
     {
         if (installer.value("os") == "win")
         {
-            installer.setValue("RunProgram", installer.value("TargetDir") + "\\QtCreator\\bin\\qtcreator.exe");
+            installer.setValue("RunProgram", installer.value("TargetDir") + "\\QtCreator\\bin\\necessitas.bat");
         }
         else if (installer.value("os") == "x11")
         {
@@ -172,5 +172,4 @@ Component.prototype.createOperations = function()
         }
         installer.setValue("RunProgramDescription", "Launch Qt Creator");
     }
-    
 }

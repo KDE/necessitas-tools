@@ -10,4 +10,5 @@
     <Default>true</Default>
     <InstallPriority>0</InstallPriority>
     <SortingPriority>0</SortingPriority>
+    <ForcedInstallation>true</ForcedInstallation>
 </Package>
