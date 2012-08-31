@@ -1,4 +1,4 @@
-MINISTRO_VERSION="0.4" #Ministro repo version
+MINISTRO_VERSION="0.406" #Ministro repo version
 
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 

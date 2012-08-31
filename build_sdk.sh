@@ -1281,7 +1281,6 @@ function compileNecessitasQt #params $1 architecture, $2 package path, $3 NDK_TA
     rm -fr install
     rm -fr Android
     unset INSTALL_ROOT
-    make QtJar
     ../qt-src/android/androidconfigbuild.sh -l $NDK_TARGET -c 0 -q 0 -n $TEMP_PATH/android-ndk -a $ANDROID_ARCH -b 0 -k 1 -i $NQT_INSTALL_DIR || error_msg "Can't install android-qt"
 
     mkdir -p $2/$1
