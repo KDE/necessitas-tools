@@ -220,9 +220,9 @@ function doMake
 {
     MAKEPROG=make
     if [ "$OSTYPE" = "msys" -o  "$OSTYPE_MAJOR" = "darwin" ] ; then
-        if [ "$OSTYPE" = "msys" ] ; then
-            MAKEDIR=`pwd -W`
-            MAKEFOREVER=1
+	if [ "$OSTYPE" = "msys" ] ; then
+	    MAKEDIR=`pwd -W`
+		MAKEFOREVER=1
             if [ ! -z $3 ] ; then
                 MAKEPROG=$3
             fi
@@ -520,13 +520,24 @@ function prepareNecessitasQtCreator
 # cleanest way I think.
 function makeInstallMinGWLibs
 {
-    if [ ! $"OSTYPE_MAJOR" = "msys" ] ; then
+    if [ ! "$OSTYPE_MAJOR" = "msys" ] ; then
         HOST_CC_PREFIX="i686-w64-mingw32-"
         HOST_CONFIG="--host=i686-w64-mingw32"
         export PATH=${TEMP_PATH}/host_compiler_tools/mingw/i686-w64-mingw32/bin:$PATH
     else
         HOST_CC_PREFIX=
         HOST_CONFIG=
+        if [ ! "$(which wget)" ] ; then
+            pushd /usr/local/bin
+            curl -S -L -O http://mingw-and-ndk.googlecode.com/files/wget.exe
+            popd
+        fi
+        if [ ! "$(which ma-make)" ] ; then
+            pushd /usr/local/bin
+            curl -S -L -O http://mingw-and-ndk.googlecode.com/files/make.exe
+            mv make.exe ma-make.exe
+            popd
+        fi
     fi
 
     # Calculate the gcc install prefix from the install location of mingw gcc. Makes a few

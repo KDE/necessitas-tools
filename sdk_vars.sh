@@ -20,7 +20,7 @@ NECESSITAS_QT_CREATOR_VERSION="2.5.81"
 #  whereas p7zip-full includes it.
 # Debian 6.0.5 runs an old 7z (9.04) with a -l option
 #  that's since been removed. It dereferences symlinks.
-if [ $(which 7z) -a ! "$(OSTYPE_MAJOR)" = "darwin" ] ; then
+if [ "$(which 7z)" -a ! "${OSTYPE_MAJOR}" = "darwin" ] ; then
     EXTERNAL_7Z=7z
     EXTERNAL_7Z_A_PARAMS="a -t7z -mx=9 -mmt=$JOBS"
     # Check if version <= 9.04 and use -l when creating windows 7zs if so.
