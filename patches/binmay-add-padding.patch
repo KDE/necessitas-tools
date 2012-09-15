@@ -1,0 +1,89 @@
+diff -urN Makefile.orig Makefile
+--- Makefile.orig	Wed Jun 15 15:52:14 2011
++++ Makefile	Sat Sep 15 12:50:01 2012
+@@ -3,9 +3,9 @@
+ binmay: binmay.c
+ 	gcc -Wall -o binmay binmay.c
+ 
+-binmay-mingw: binmay.c
+-	/usr/bin/i586-mingw32msvc-gcc -Wall -o binmay-mingw binmay.c
++binmay.exe: binmay.c
++	gcc -Wall -o binmay.exe binmay.c
+ 
+ 
+ clean:
+-	rm -f binmay
++	rm -f binmay binmay.exe
+diff -urN binmay-110615/binmay.c binmay-110615.new/binmay.c
+--- binmay.c.orig	Wed Jun 15 15:52:14 2011
++++ binmay.c	Sat Sep 15 12:37:58 2012
+@@ -96,6 +96,7 @@
+ void masked_string_ensuremask( struct masked_string *masked ); 
+ void masks_check( struct masked_string *search, struct masked_string *replace ); 
+ int masked_string_isset( struct masked_string *masked ); 
++void add_padding( struct masked_string *search, struct masked_string *replace );
+ 
+ struct buffered_handle *buffered_handle_new( char *filename, FILE *def, const char *mode ); 
+ struct file_handle *file_handle_new( char *filename, FILE *def, const char *mode ); 
+@@ -114,12 +115,12 @@
+ //	infile=stdin;
+ //	outfile=stdout;
+ 
+-	char options[] = "bvp:S:R:i:o:s:r:";
++	char options[] = "abvp:S:R:i:o:s:r:";
+ 	if( 1 == argc ) {
+ 		use();
+ 		return 0;
+ 	}
+-
++	int want_padding = 0;
+ 	while( (c=getopt( argc, argv, options )) >0 ) {
+ 		switch( c ) {
+ 			case 'b':
+@@ -149,6 +150,10 @@
+ 				masked_string_setmask( replace, optarg );
+ 				break;
+ 
++			case 'a':
++				want_padding = 1;
++				break;
++
+ 			case 'p':
+ 				if( strlen( optarg ) > BUF_LEN ) {
+ 					fprintf(stderr, "The replace mask is longer than the buffer :(\n");
+@@ -175,7 +180,9 @@
+ 
+ 	masked_string_ensuremask( search );
+ 	masks_check( search, replace );
+-
++	if ( want_padding ) {
++		add_padding( search, replace );
++	}
+ 	if( masked_string_isset( search )  && -1 != plen ) {
+ 		perror( "I don't know how to puke and search at the same time.");
+ 	}
+@@ -760,6 +767,16 @@
+ 		}
+ 	}
+ } // }}}
++void add_padding( struct masked_string *search, struct masked_string *replace )
++{
++	if ( replace->length > search->length ){
++		fprintf(stderr, "Can't use -a (padding mode) when replacement length is > than search length!" );
++		exit(1);
++	}
++	for (; replace->length < search->length; ++replace->length ) {
++		replace->string[replace->length] = '\0';
++	}
++}
+ void use() // {{{
+ {
+ 	fprintf( stderr, 
+@@ -776,6 +793,7 @@
+ 		"      -r [string]    replacement string (in hex, see below)\n"
+ 		"      -S [string]    search mask (see readme)\n"
+ 		"      -R [string]    replace mask (see readme)\n"
++		"      -a             add \\0 padding so filesize remains the same\n"
+ 		"\n"
+ 		"  string format:\n"
+ 		"      By default search/replace/mask strings are treated as hex.\n"
