@@ -2006,6 +2006,8 @@ prepareNecessitasQt
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     prepareNecessitasQtTools windows
+    # Leave the following line in as I use it when I need to transfer the Windows Qt Android Tools to, err, Windows before patching and testing.
+    #find $TEMP_PATH/out/necessitas/sdk_src/ -path "*org.kde.necessitas.android.qt*tools-windows*.7z" -exec bash -c 'cp -rf $(dirname $(dirname {})) /media/win7c' \;
     #prepareNecessitasQtTools macosx
 fi
 
