@@ -1141,6 +1141,8 @@ function prepareSDKs
             mkdir -p android-sdk-windows/tools/
             cp android-various/android-sdk/android.exe android-sdk-windows/tools/
             createArchive android-sdk-windows android-sdk-windows-tools-mingw-android.7z
+            mkdir -p android-sdk-windows/platform-tools/
+            downloadIfNotExists android-sdk-windows/platform-tools/adb.exe http://mingw-and-ndk.googlecode.com/files/adb.exe
             mv android-sdk-windows-tools-mingw-android.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.platform_tools/data/android-sdk-windows-tools-mingw-android.7z
             rm -rf android-various
         fi
