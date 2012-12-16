@@ -1138,11 +1138,12 @@ function prepareSDKs
             pushd android-various/android-sdk
             gcc -Wl,-subsystem,windows -Wno-write-strings android.cpp -static-libgcc -s -O2 -o android.exe
             popd
-            mkdir -p android-sdk-windows/tools/
-            cp android-various/android-sdk/android.exe android-sdk-windows/tools/
-            createArchive android-sdk-windows android-sdk-windows-tools-mingw-android.7z
-            mkdir -p android-sdk-windows/platform-tools/
-            downloadIfNotExists android-sdk-windows/platform-tools/adb.exe http://mingw-and-ndk.googlecode.com/files/adb.exe
+            mkdir -p android-sdk/tools/
+            cp android-various/android-sdk/android.exe android-sdk/tools/
+            mkdir -p android-sdk/platform-tools/
+            downloadIfNotExists adb.exe http://mingw-and-ndk.googlecode.com/files/adb.exe
+            mv adb.exe android-sdk/platform-tools/
+            createArchive android-sdk android-sdk-windows-tools-mingw-android.7z
             mv android-sdk-windows-tools-mingw-android.7z $REPO_PATH_PACKAGES/org.kde.necessitas.misc.sdk.platform_tools/data/android-sdk-windows-tools-mingw-android.7z
             rm -rf android-various
         fi
