@@ -37,3 +37,15 @@ function Component()
     installer.setValue("GlobalDemosDir", "Demos");
     installer.setValue("QtVersionLabel", "Necessitas Qt SDK");
 }
+
+Component.prototype.createOperations = function()
+{
+    // Call the base createOperations and afterwards set some registry settings
+    component.createOperations();
+    if (installer.value("QtCreatorSettingsFile") !== "")
+        component.addOperation( "SimpleMoveFile", "@QtCreatorSettingsFile@", "@QtCreatorSettingsFile@_backup");
+    if (installer.value("QtCreatorSettingsQtVersionFile") !== "")
+        component.addOperation( "SimpleMoveFile", "@QtCreatorSettingsQtVersionFile@", "@QtCreatorSettingsQtVersionFile@_backup");
+    if (installer.value("QtCreatorSettingsToolchainsFile") !== "")
+        component.addOperation( "SimpleMoveFile", "@QtCreatorSettingsToolchainsFile@", "@QtCreatorSettingsToolchainsFile@_backup");
+}

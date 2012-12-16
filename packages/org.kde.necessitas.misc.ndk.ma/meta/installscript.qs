@@ -35,10 +35,27 @@ function Component()
     }
 }
 
+Component.prototype.beginInstallation = function()
+{
+    if (installer.value("os") == "x11" )
+        component.setStopProcessForUpdateRequest("@TargetDir@/QtCreator/bin/qtcreator", true);
+    else if (installer.value("os") == "mac")
+        component.setStopProcessForUpdateRequest("@TargetDir@/Qt Creator.app/Contents/MacOS/Qt Creator", true);
+    else if (installer.value("os") === "win")
+        component.setStopProcessForUpdateRequest("qtcreator.exe", true);
+}
+
 Component.prototype.createOperations = function()
 {
     // Call the base createOperations(unpacking ...)
     component.createOperations();
+    if (installer.isUpdater())
+    {
+        if (installer.value("os") == "mac")
+            component.addOperation( "SimpleMoveFile", "@TargetDir@/Qt Creator.app/Contents/Resources/Nokia/android.xml", "@TargetDir@/Qt Creator.app/Contents/Resources/Nokia/android.xml_backup");
+        else
+            component.addOperation( "SimpleMoveFile", "@TargetDir@/QtCreator/share/qtcreator/Nokia/android.xml", "@TargetDir@/QtCreator/share/qtcreator/Nokia/android.xml_backup");
+    }
     // set NDK Location
     component.addOperation( "RegisterPersistentSettings",
                             "android.xml",
@@ -48,7 +65,7 @@ Component.prototype.createOperations = function()
     component.addOperation( "RegisterPersistentSettings",
                             "android.xml",
                             "NDKToolchainVersion",
-                            "4.6" );
+                            "4.4.3" );
 
     // set DEFAULT gdb location
     var gdbPath = "@TargetDir@/android-ndk/toolchains/arm-linux-androideabi-4.6/prebuilt/";
