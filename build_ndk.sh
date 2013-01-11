@@ -15,7 +15,7 @@ LOG_FILE=/dev/null
 HELP=
 VERBOSE=1
 
-NDK_VER=r8b
+NDK_VER=r8d
 DATESUFFIX=$(date +%y%m%d)
 # This must be the same as TEMP_PATH in build_sdk.sh
 if [ "$OSTYPE_MAJOR" = "msys" ] ; then
@@ -69,7 +69,8 @@ fi
 
 case $OSTYPE_MAJOR in
     linux*)
-        SYSTEMS=linux-x86,windows-x86
+# All of 'em
+        SYSTEMS=linux-x86,linux-x86_64,windows-x86,windows-x86_64,darwin-x86,darwin-x86_64
 #        SYSTEMS=linux-x86
         NUM_CORES=$(grep -c -e '^processor' /proc/cpuinfo)
         BUILD_OS="linux"
@@ -358,9 +359,9 @@ NDK_TOP="$BUILD_DIR"/android-qt-ndk
 NDK=$NDK_TOP/ndk
 if [ ! -d $NDK ] ; then
   git clone http://anongit.kde.org/android-qt-ndk.git $NDK
-  (cd $NDK; git checkout -b ndk-r8b-fixes -t origin/ndk-r8b-fixes)
+  (cd $NDK; git checkout -b ndk-r8d-fixes -t origin/ndk-r8d-fixes)
 #  git clone https://android.googlesource.com/platform/ndk.git $NDK
-#  (cd $NDK; git checkout -b ndk-r8b-fixes)
+#  (cd $NDK; git checkout -b ndk-r8d-fixes)
   fail_panic "Couldn't clone ndk"
 fi
 if [ ! -d $NDK_TOP/development ] ; then
@@ -505,12 +506,7 @@ system_name_to_final_folder_name ()
     esac
 }
 
-GCC_4_6_VER=4.6
-if [ ! -z "$LINARO" ] ; then
-  GCC_4_6_VER=4.6.3
-fi
-
-GCC_VERSIONS="4.4.3 $GCC_4_6_VER"
+GCC_VERSIONS="4.4.3 4.6 4.7"
 for TARCH in $LIST_ARCHES ; do
   for GCC_VERSION in $GCC_VERSIONS ; do
     ARCHES_BY_VERSIONS="$ARCHES_BY_VERSIONS "$(system_name_to_final_folder_name $TARCH)-$GCC_VERSION
@@ -527,11 +523,12 @@ PACKAGE_DIR=$PWD/release-$DATESUFFIX
 
 mkdir -p $PACKAGE_DIR
 
+if [ "1" = "1" ] ; then
 #  --no-strip \
+#  --force-gold-build \
+#  --default-ld=gold \
 $NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
   --gmp-version=5.0.5 \
-  --force-gold-build \
-  --default-ld=gold \
   --systems="$SYSTEMS" \
   --build-dir=$GCC_BUILD_DIR \
   --package-dir=$PACKAGE_DIR \
@@ -577,6 +574,7 @@ rm -rf /tmp/ndk-$USER/build/gdbserver*
 #fi
 #ARCHES_WITHOUT_MIPS=$(spaces_to_commas $ARCHES_WITHOUT_MIPS)
 ARCHES_WITHOUT_MIPS=$ARCHES
+fi
 
 $NDK/build/tools/build-target-prebuilts.sh \
   --ndk-dir=$NDK \
