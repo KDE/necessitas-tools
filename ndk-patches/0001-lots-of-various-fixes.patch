@@ -1,0 +1,762 @@
+diff --git a/build/core/init.mk b/build/core/init.mk
+index 9b4e28a..d435f25 100644
+--- a/build/core/init.mk
++++ b/build/core/init.mk
+@@ -218,9 +218,9 @@ ifndef HOST_ARCH
+         HOST_ARCH := $(PROCESSOR_ARCHITECTURE)
+         ifeq ($(HOST_ARCH),AMD64)
+             HOST_ARCH := x86
+-        endif
+-        ifneq ("",$(shell echo "%ProgramW6432%"))
+             HOST_ARCH64 := x86_64
++        else
++            HOST_ARCH := x86
+         endif
+     else # HOST_OS_BASE != windows
+         UNAME := $(shell uname -m)
+diff --git a/build/core/ndk-common.sh b/build/core/ndk-common.sh
+index e8c2389..8adc5ed 100644
+--- a/build/core/ndk-common.sh
++++ b/build/core/ndk-common.sh
+@@ -90,9 +90,9 @@ fi
+ #
+ setup_default_log_file ()
+ {
+-    if [ -n "$NDK_LOGFILE" ] ; then
+-        return
+-    fi
++#    if [ -n "$NDK_LOGFILE" ] ; then
++#        return
++#    fi
+     if [ -n "$1" ] ; then
+         NDK_LOGFILE="$1"
+     else
+@@ -170,6 +170,7 @@ run ()
+ 
+ run2 ()
+ {
++    echo "run2 arg1=$1 VERBOSE2=$VERBOSE2 VERBOSE=$VERBOSE TMPLOG=$TMPLOG"
+     if [ "$VERBOSE2" = "yes" ] ; then
+         echo "## COMMAND: $@"
+         "$@" 2>&1
+diff --git a/build/tools/build-gnu-libstdc++.sh b/build/tools/build-gnu-libstdc++.sh
+index f42240e..927cb86 100755
+--- a/build/tools/build-gnu-libstdc++.sh
++++ b/build/tools/build-gnu-libstdc++.sh
+@@ -64,6 +64,9 @@ register_var_option "--abis=<list>" ABIS "Specify list of target ABIs."
+ NO_MAKEFILE=
+ register_var_option "--no-makefile" NO_MAKEFILE "Do not use makefile to speed-up build"
+ 
++VISIBLE_LIBGNUSTL_STATIC=
++register_var_option "--visible-libgnustl-static" VISIBLE_LIBGNUSTL_STATIC "Do not use hidden visibility for libgnustl_static.a"
++
+ register_jobs_option
+ 
+ extract_parameters "$@"
+@@ -184,13 +187,15 @@ build_gnustl_for_abi ()
+     if [ $LIBTYPE = "static" ]; then
+         # Ensure we disable visibility for the static library to reduce the
+         # size of the code that will be linked against it.
+-        LIBTYPE_FLAGS="--enable-static --disable-shared"
+-        if [ $GCC_VERSION = "4.4.3" -o $GCC_VERSION = "4.6" ]; then
+-            LIBTYPE_FLAGS=$LIBTYPE_FLAGS" --disable-visibility"
+-        else
+-            LIBTYPE_FLAGS=$LIBTYPE_FLAGS" --disable-libstdcxx-visibility"
++        if [ -z "$VISIBLE_LIBGNUSTL_STATIC" ] ; then
++            LIBTYPE_FLAGS="--enable-static --disable-shared"
++            if [ $GCC_VERSION = "4.4.3" -o $GCC_VERSION = "4.6" ]; then
++                LIBTYPE_FLAGS=$LIBTYPE_FLAGS" --disable-visibility"
++            else
++                LIBTYPE_FLAGS=$LIBTYPE_FLAGS" --disable-libstdcxx-visibility"
++            fi
++            CXXFLAGS=$CXXFLAGS" -fvisibility=hidden -fvisibility-inlines-hidden"
+         fi
+-        CXXFLAGS=$CXXFLAGS" -fvisibility=hidden -fvisibility-inlines-hidden"
+     else
+         LIBTYPE_FLAGS="--disable-static --enable-shared"
+         #LDFLAGS=$LDFLAGS" -lsupc++"
+diff --git a/build/tools/build-host-gcc.sh b/build/tools/build-host-gcc.sh
+index 469eced..a0f598c 100755
+--- a/build/tools/build-host-gcc.sh
++++ b/build/tools/build-host-gcc.sh
+@@ -35,10 +35,13 @@ toolchains among the following names:
+ 
+   arm-linux-androideabi-4.4.3
+   arm-linux-androideabi-4.6
++  arm-linux-androideabi-4.7
+   x64-4.4.3
+   x86-4.6
++  x86-4.7
+   mipsel-linux-android-4.4.3
+   mipsel-linux-android-4.6
++  mipsel-linux-android-4.7
+ 
+ By default, the script rebuilds the toolchain(s) for you host system [$HOST_TAG],
+ but you can use --systems=<tag1>,<tag2>,.. to ask binaries that can run on
+@@ -59,7 +62,8 @@ for four different systems:
+   $PROGNAME --toolchain-src-dir=/path/to/toolchain/src \
+     --systems=linux-x86,linux-x86_64,windows,windows-x86_64 \
+     arm-linux-androideabi-4.4.3 \
+-    arm-linux-androideabi-4.6
++    arm-linux-androideabi-4.6 \
++    arm-linux-androideabi-4.7
+ 
+ You can build Windows binaries on Linux if you have a Windows-targetting
+ cross-toolchain installed and in your path. Note that the script named
+@@ -127,6 +131,9 @@ register_var_option "--toolchain-src-dir=<path>" TOOLCHAIN_SRC_DIR "Select toolc
+ NDK_DIR=$ANDROID_NDK_ROOT
+ register_var_option "--ndk-dir=<path>" NDK_DIR "Select NDK install directory"
+ 
++BUILD_DIR=
++register_var_option "--build-dir=<path>" BUILD_DIR "Build GCC into directory"
++
+ PACKAGE_DIR=
+ register_var_option "--package-dir=<path>" PACKAGE_DIR "Package prebuilt tarballs into directory"
+ 
+@@ -166,7 +173,8 @@ extract_parameters "$@"
+ 
+ TOOLCHAINS=$PARAMETERS
+ if [ -z "$TOOLCHAINS" ]; then
+-    TOOLCHAINS="arm-linux-androideabi-4.4.3,arm-linux-androideabi-4.6,x86-4.4.3,x86-4.6,mipsel-linux-android-4.4.3,mipsel-linux-android-4.6"
++#    TOOLCHAINS="arm-linux-androideabi-4.4.3,arm-linux-androideabi-4.6,arm-linux-androideabi-4.7,x86-4.4.3,x86-4.6,x86-4.7,mipsel-linux-android-4.4.3,mipsel-linux-android-4.6,mipsel-linux-android-4.7"
++    TOOLCHAINS="arm-linux-androideabi-4.4.3"
+     dump "Auto-config: $TOOLCHAINS"
+ fi
+ 
+@@ -174,6 +182,10 @@ if [ -z "$TOOLCHAIN_SRC_DIR" ]; then
+     panic "Please use --toolchain-src-dir=<path> to select toolchain source directory."
+ fi
+ 
++if [ -z "$BUILD_DIR" ]; then
++    BUILD_DIR=/tmp/ndk-$USER/build/host-gcc
++fi
++
+ case $DEFAULT_LD in
+     gold|bfd)
+       ;;
+@@ -451,7 +463,6 @@ run_on_setup ()
+ 
+ setup_build ()
+ {
+-    BUILD_DIR=/tmp/ndk-$USER/build/host-gcc
+     run_on_setup mkdir -p "$BUILD_DIR"
+     if [ -n "$FORCE" ]; then
+         rm -rf "$BUILD_DIR"/*
+@@ -483,23 +494,12 @@ stamps_do ()
+     local NAME=$1
+     shift
+     if [ ! -f "$STAMPS_DIR/$NAME" ]; then
+-        "$@"
++        ("$@")
+         fail_panic
+         mkdir -p "$STAMPS_DIR" && touch "$STAMPS_DIR/$NAME"
+     fi
+ }
+ 
+-get_default_binutils_version_for_gcc ()
+-{
+-    local RET
+-    case $1 in
+-        arm-*-4.4.3|x86-*-4.4.3|x86-4.4.3) RET=2.19;;
+-        *-4.6) RET=2.21;;
+-        *) RET=2.22;;
+-    esac
+-    echo "$RET"
+-}
+-
+ # Check that a given compiler generates code correctly
+ #
+ # This is to detect bad/broken toolchains, e.g. amd64-mingw32msvc
+@@ -1071,6 +1071,9 @@ setup_host_env ()
+     if [ -z "$NO_STRIP" ]; then
+         CFLAGS="-O2 -Os -fomit-frame-pointer -s"
+         CXXFLAGS=$CFLAGS
++    else
++        CFLAGS="-O0 -g"
++        CXXFLAGS="-O0 -g"
+     fi
+ 
+     # This should only used when building the target GCC libraries
+@@ -1083,6 +1086,12 @@ setup_host_env ()
+     PATH=$WRAPPERS_DIR:$PATH
+ }
+ 
++setup_logging ()
++{
++    VERBOSE=yes
++    setup_default_log_file "$1/output.$2.log"
++}
++
+ # $1: NDK architecture name (e.g. 'arm')
+ arch_sysroot_install_dir ()
+ {
+@@ -1101,7 +1110,8 @@ gen_minimal_sysroot ()
+     local ARCH=$1
+     local INSTALL_DIR=$(arch_sysroot_install_dir $ARCH)
+ 
+-    dump "$(arch_text) Generating minimal sysroot."
++    dump "$(arch_text) Generating minimal sysroot (INSTALL_DIR=$INSTALL_DIR)"
++    setup_logging "$INSTALL_DIR" gen_minimal_sysroot
+     run2 $NDK_BUILDTOOLS_PATH/gen-platforms.sh --minimal --arch=$ARCH --dst-dir="$INSTALL_DIR"
+ }
+ 
+@@ -1130,13 +1140,16 @@ build_gmp ()
+         setup_host_env &&
+         BUILD_DIR="$(host_build_dir_for gmp-$GMP_VERSION)" &&
+         run2 mkdir -p "$BUILD_DIR" && run2 rm -rf "$BUILD_DIR"/* &&
++	setup_logging "$BUILD_DIR" configure &&
+         cd "$BUILD_DIR" &&
+         run2 "$SRC_DIR"/configure \
+             --prefix=$INSTALL_DIR \
+             --build=$BUILD \
+             --host=$HOST \
+             --disable-shared &&
++	setup_logging "$BUILD_DIR" make &&
+         run2 make -j$NUM_JOBS &&
++	setup_logging "$BUILD_DIR" install &&
+         run2 make install -j$NUM_INSTALL_JOBS
+     )
+     return $?
+@@ -1167,6 +1180,7 @@ build_mpfr ()
+         setup_host_env &&
+         BUILD_DIR="$(host_build_dir_for mpfr-$MPFR_VERSION)" &&
+         run2 mkdir -p "$BUILD_DIR" && run2 rm -rf "$BUILD_DIR"/* &&
++	setup_logging "$BUILD_DIR" configure &&
+         cd $BUILD_DIR &&
+         run2 "$SRC_DIR"/configure \
+             --prefix=$INSTALL_DIR \
+@@ -1174,7 +1188,9 @@ build_mpfr ()
+             --host=$HOST \
+             --disable-shared \
+             --with-gmp=$INSTALL_DIR &&
++	setup_logging "$BUILD_DIR" make &&
+         run2 make -j$NUM_JOBS &&
++	setup_logging "$BUILD_DIR" install &&
+         run2 make -j$NUM_INSTALL_JOBS install
+     )
+     return $?
+@@ -1207,6 +1223,7 @@ build_mpc ()
+         setup_host_env &&
+         BUILD_DIR="$(host_build_dir_for mpc-$MPC_VERSION)" &&
+         run2 mkdir -p "$BUILD_DIR" && run2 rm -rf "$BUILD_DIR"/* &&
++	setup_logging "$BUILD_DIR" configure &&
+         cd $BUILD_DIR &&
+         run2 "$SRC_DIR"/configure \
+             --prefix=$INSTALL_DIR \
+@@ -1215,7 +1232,9 @@ build_mpc ()
+             --disable-shared \
+             --with-gmp=$INSTALL_DIR \
+             --with-mpfr=$INSTALL_DIR &&
++	setup_logging "$BUILD_DIR" make &&
+         run2 make -j$NUM_JOBS &&
++	setup_logging "$BUILD_DIR" install &&
+         run2 make -j$NUM_INSTALL_JOBS install
+     )
+     return $?
+@@ -1262,16 +1281,11 @@ build_host_binutils ()
+ 
+     LD_NAME=$DEFAULT_LD
+ 
+-    # Enable Gold, for specific builds. The version before binutils 2.21
+-    # is buggy so don't use it
+-    case $HOST_OS in
+-        windows) BUILD_GOLD=;; # Gold doesn't compile on Windows!
+-        darwin) BUILD_GOLD=;;  # Building Gold fails with an internal compiler error on Darwin!
+-        *) BUILD_GOLD=true;;
+-    esac
++    # Enable Gold globally. It can be built for all hosts.
++    BUILD_GOLD=true
+ 
+-    # Special case, gold in binutil-2.21 doesn't build when targetting mips
+-    if [ "$BINUTILS_VERSION" = "2.21" -a "$TARGET" = "mipsel-linux-android" ]; then
++    # Special case, gold is not ready for mips yet.
++    if [ "$TARGET" = "mipsel-linux-android" ]; then
+         BUILD_GOLD=
+     fi
+ 
+@@ -1280,6 +1294,12 @@ build_host_binutils ()
+     #
+     if [ "$BINUTILS_VERSION" = "2.21" -a "$TARGET" = "i686-linux-android" ]; then
+         USE_LD_DEFAULT=true
++        BUILD_GOLD=
++    fi
++
++    # Another special case. Not or 2.19, it wasn't ready
++    if [ "$BINUTILS_VERSION" = "2.19" ]; then
++        BUILD_GOLD=
+     fi
+ 
+     if [ "$DEFAULT_LD" = "gold" -a -z "$BUILD_GOLD" ]; then
+@@ -1299,6 +1319,7 @@ build_host_binutils ()
+     # The BFD linker is always built, but to build Gold, we need a specific
+     # option for the binutils configure script. Note that its format has
+     # changed during development.
++    export host_configargs=
+     if [ "$BUILD_GOLD" ]; then
+         # The syntax of the --enable-gold option has changed.
+         if version_is_greater_than $BINUTILS_VERSION 2.20; then
+@@ -1314,11 +1335,19 @@ build_host_binutils ()
+                 ARGS=$ARGS" --enable-gold=both/gold"
+             fi
+         fi
++	# This ARG needs quoting when passed to run2.
++	GOLD_LDFLAGS_ARG=
+         if [ "$HOST_OS" = 'windows' ]; then
+             # gold may have runtime dependency on libgcc_sjlj_1.dll and
+             # libstdc++-6.dll when built by newer versions of mingw.
+             # Link them statically to avoid that.
+-            ARGS=$ARGS" --with-gold-ldflags='-static-libgcc -static-libstdc++'"
++            if version_is_greater_than $BINUTILS_VERSION 2.22; then
++                export host_configargs="--with-gold-ldflags='-static-libgcc -static-libstdc++'"
++            elif version_is_greater_than $BINUTILS_VERSION 2.21; then
++                GOLD_LDFLAGS_ARG="--with-gold-ldflags=-static-libgcc -static-libstdc++"
++            else
++                export LDFLAGS=$LDFLAGS" -static-libgcc -static-libstdc++"
++            fi
+         fi
+     fi
+ 
+@@ -1332,19 +1361,29 @@ build_host_binutils ()
+     # Enable plugins support for binutils-2.21+
+     # This is common feature for binutils and gcc
+     case "$BINUTILS_VERSION" in
+-      2.19)
+-        # Add nothing
++      2.19|2.21)
++        # Add nothing - note, the only thing preventing this working for 2.21 is the
++	#               need to backport the 2.22 Windows patch to plugin.c (dlfcn.h/LoadLibrary etc)
+         ;;
+       *)
+         ARGS=$ARGS" --enable-plugins"
+         ;;
+     esac
+ 
++# To pass gold-ldflags, the following works:
++#       --with-sysroot="$INSTALL_DIR/sysroot" \
++#       $ARGS "--with-gold-ldflags=-static-libgcc -static-libstdc++" &&
++#       setup_logging "$BUILD_DIR" make &&
++
++
++# $ARGS "--with-gold-ldflags=-static-libgcc -static-libstdc++" && # <- this works...
++
+     dump "$(host_text)$(target_text) Building binutils-$BINUTILS_VERSION"
+     (
+-        setup_host_env &&
++        setup_host_env && set -x &&
+         BUILD_DIR="$(host_build_dir_for binutils-$BINUTILS_VERSION-$TARGET)" &&
+         run2 mkdir -p "$BUILD_DIR" && run2 rm -rf "$BUILD_DIR"/* &&
++	setup_logging "$BUILD_DIR" configure &&
+         cd "$BUILD_DIR" &&
+         run2 "$SRC_DIR"/configure \
+             --prefix="$INSTALL_DIR" \
+@@ -1355,8 +1394,10 @@ build_host_binutils ()
+             --host=$HOST \
+             --target=$TARGET \
+             --with-sysroot="$INSTALL_DIR/sysroot" \
+-            $ARGS &&
++            $ARGS "$GOLD_LDFLAGS_ARG" &&
++	setup_logging "$BUILD_DIR" make &&
+         run2 make -j$NUM_JOBS &&
++	setup_logging "$BUILD_DIR" install &&
+         run2 make -j$NUM_INSTALL_JOBS install &&
+         # We need to take care of something weird, binutils-2.21 on mips
+         # doesn't seem to build gold, and the Makefile script forgets to
+@@ -1377,7 +1418,7 @@ copy_target_sysroot ()
+     # We need the arch-specific minimal sysroot
+     stamps_do sysroot-arch-$TARGET_ARCH gen_minimal_sysroot $TARGET_ARCH
+ 
+-    dump "$(host_text)$(toolchain_text) Copying $TARGET_ARCH sysroot"
++    dump "$(host_text)$(toolchain_text) Copying $TARGET_ARCH sysroot ($SRC_SYSROOT -> $SYSROOT)"
+     run2 rm -rf "$SYSROOT" &&
+     run2 copy_directory "$SRC_SYSROOT" "$SYSROOT"
+ }
+@@ -1400,15 +1441,37 @@ build_host_gcc_core ()
+ 
+     ARGS=$HOST_PREREQS_ARGS
+ 
++    # Hijacked for libgomp - doesn't work for x86 (and probably not mips either).
+     case "$GCC_VERSION" in
+-      4.4.3|4.6)
+-        ARGS=$ARGS" --disable-plugin"
+-        ;;
++     4.4.3)
++       ARGS=$ARGS" --disable-libgomp"
++       ;;
++     *)
++       case $TARGET_ARCH in
++	     arm) ARGS=$ARGS" --enable-libgomp";;
++	     x86) ARGS=$ARGS" --disable-libgomp";;
++	     mips|mipsel) ARGS=$ARGS" --disable-libgomp";;
++	 esac
++	 ;;
++    esac
++
++    # Plugins are not supported well before 4.7. On 4.7 it's required to have
++    # -flto working. Flag --enable-plugins (note 's') is actually for binutils,
++    # this is compiler requirement to have binutils configured this way. Flag
++    # --disable-plugin is for gcc -
++    # In fact, enable-plugins is broken all Canadian Cross GCC.
++    case "$GCC_VERSION" in
++     4.4.3|4.6|4.7)
++       ARGS=$ARGS" --disable-plugins --disable-plugin"
++       ;;
++    # Doesn't even work on 4.8. /home/ray/Dropbox/ndk-work/gcc-4.8-20130113-android-hacky.patch
++     *)
++       ARGS=$ARGS" --enable-plugins  --enable-plugin"
++       ;;
+     esac
+ 
+     ARGS=$ARGS" --with-gnu-as --with-gnu-ld"
+     ARGS=$ARGS" --enable-threads --disable-libssp --disable-libmudflap"
+-    ARGS=$ARGS" --disable-libgomp"  # TODO: Add option to enable this
+     ARGS=$ARGS" --disable-libstdc__-v3 --disable-sjlj-exceptions"
+     ARGS=$ARGS" --disable-tls"
+     ARGS=$ARGS" --disable-libquadmath --disable-libitm --disable-bootstrap"
+@@ -1439,6 +1502,7 @@ build_host_gcc_core ()
+         setup_host_env &&
+         BUILD_DIR="$(host_build_dir_for gcc-$GCC_VERSION-$TARGET)" &&
+         run2 mkdir -p "$BUILD_DIR" && run2 rm -rf "$BUILD_DIR"/* &&
++	setup_logging "$BUILD_DIR" configure &&
+         cd "$BUILD_DIR" &&
+         PATH=$NEW_PATH:$PATH &&
+         run2 "$SRC_DIR"/configure \
+@@ -1448,7 +1512,9 @@ build_host_gcc_core ()
+             --target=$TARGET \
+             --with-sysroot="$INSTALL_DIR/sysroot" \
+             $HOST_PREREQS_ARGS $ARGS &&
++	setup_logging "$BUILD_DIR" make &&
+         run2 make -j$NUM_JOBS all-gcc &&
++	setup_logging "$BUILD_DIR" install &&
+         run2 make -j$NUM_INSTALL_JOBS install-gcc
+     )
+     return $?
+@@ -1470,7 +1536,9 @@ build_target_gcc_libs ()
+         BUILD_DIR="$(host_build_dir_for gcc-$GCC_VERSION-$TARGET)" &&
+         cd "$BUILD_DIR" &&
+         PATH=$NEW_PATH:$PATH &&
++	setup_logging "$BUILD_DIR" make &&
+         run2 make -j$NUM_JOBS all &&
++	setup_logging "$BUILD_DIR" install &&
+         run2 make -j$NUM_INSTALL_JOBS install
+     )
+     return $?
+@@ -1607,7 +1675,7 @@ if [ "$PACKAGE_DIR" ]; then
+     for SYSTEM in $HOST_SYSTEMS; do
+         setup_build_for_host $SYSTEM
+         for TOOLCHAIN in $TOOLCHAINS; do
+-            package_gcc $SYSTEM $TOOLCHAIN "$PACKAGE_DIR"
++            stamps_do package_gcc-$SYSTEM-$TOOLCHAIN package_gcc $SYSTEM $TOOLCHAIN "$PACKAGE_DIR"
+         done
+     done
+     echo "Done. See the content of $PACKAGE_DIR:"
+diff --git a/build/tools/build-host-gdb.sh b/build/tools/build-host-gdb.sh
+index 4727439..72549a9 100755
+--- a/build/tools/build-host-gdb.sh
++++ b/build/tools/build-host-gdb.sh
+@@ -203,6 +203,8 @@ build_host_gdb ()
+             CXXFLAGS=$CXXFLAGS" -D__USE_MINGW_ANSI_STDIO=1"
+         fi
+     fi
++    # Needed for expat when cross compiling.
++    CFLAGS=$CFLAGS"   -I${BH_BUILD_DIR}/install-expat-2.0.1-$1/include -L${BH_BUILD_DIR}/install-expat-2.0.1-$1/lib"
+ 
+     TEXT="$(bh_host_text) gdb-$BH_TARGET_ARCH-$3:"
+ 
+@@ -280,7 +282,7 @@ if [ "$PACKAGE_DIR" ]; then
+         bh_setup_build_for_host $SYSTEM
+         for ARCH in $ARCHS; do
+             for VERSION in $GDB_VERSION; do
+-                package_host_gdb $SYSTEM android-$ARCH $VERSION
++                bh_stamps_do package_host_gdb-$SYSTEM-$ARCH-$VERSION package_host_gdb $SYSTEM android-$ARCH $VERSION
+             done
+         done
+     done
+diff --git a/build/tools/build-host-python.sh b/build/tools/build-host-python.sh
+index 08738ff..8d14ace 100755
+--- a/build/tools/build-host-python.sh
++++ b/build/tools/build-host-python.sh
+@@ -363,6 +363,7 @@ ARCHS=$(commas_to_spaces $ARCHS)
+ # Let's build this
+ for SYSTEM in $BH_HOST_SYSTEMS; do
+     bh_setup_build_for_host $SYSTEM
++    setup_default_log_file $BH_BUILD_DIR/$SYSTEM.build.log
+     for VERSION in $PYTHON_VERSION; do
+         need_install_host_python $SYSTEM $VERSION
+     done
+@@ -372,7 +373,7 @@ if [ "$PACKAGE_DIR" ]; then
+     for SYSTEM in $BH_HOST_SYSTEMS; do
+         bh_setup_build_for_host $SYSTEM
+         for VERSION in $PYTHON_VERSION; do
+-            package_host_python $SYSTEM $VERSION
++            bh_stamps_do package_host_python-$SYSTEM-$VERSION package_host_python $SYSTEM $VERSION
+         done
+     done
+ fi
+diff --git a/build/tools/build-mingw64-toolchain.sh b/build/tools/build-mingw64-toolchain.sh
+index a05e37f..a9bb83b 100755
+--- a/build/tools/build-mingw64-toolchain.sh
++++ b/build/tools/build-mingw64-toolchain.sh
+@@ -132,7 +132,11 @@ if [ "$OS" != "linux" ]; then
+     echo "WARNING: WARNING: WARNING: THIS SCRIPT PROBABLY ONLY WORKS ON LINUX!!"
+ fi
+ 
++#GMP_VERSION=5.1.0
++#GMP_URL=ftp://ftp.gmplib.org/pub/gmp-$GMP_VERSION/
+ GMP_VERSION=5.0.5
++GMP_URL=http://ftp.gnu.org/gnu/gmp/
++
+ MPFR_VERSION=3.1.1
+ MPC_VERSION=1.0.1
+ BINUTILS_VERSION=2.22
+@@ -142,11 +146,44 @@ GCC_VERSION=4.7.2
+ #  as otherwise gold can't be built.
+ # Only work up to svn@5177.  Better use
+ #  https://mingw-w64.svn.sourceforge.net/svnroot/mingw-w64/stable/v2.x
+-MINGW_W64_VERSION=svn@5166
++#MINGW_W64_VERSION=svn@5166 # ... works. I built 4.4.3 and 7.3.x anyway, but then I deleted it all.
++
++#MINGW_W64_VERSION=svn@5186 # should be current latest revision, should fail.
++
++# widl nonsense (how hard is it to specify a program to configure, come on guys)...
++# r4698 -> adds it, testing with PATH=, --with-widl=results in.
++
++#MINGW_W64_VERSION=svn@5166 # ... works. I built 4.4.3 and 7.3.x anyway, but then I deleted it all.
++#
++#MINGW_W64_VERSION=svn@5352  # Fails: Could not generate a temp name from include/audiopolicy.h.SGUDS0
++MINGW_W64_VERSION=svn@5445
++#MINGW_W64_VERSION=svn@5538 # ... configuring gcc fails with "error: #error Only Win32 target is supported"
++
++#[1] configure:5267: checking for the correct version of gmp.h
++# configure:5287: i686-linux-gcc -c -O2 -fomit-frame-pointer -s -I/tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32/include -I/tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32/include -I/tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32/include   conftest.c >&5
++# In file included from /tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32/include/crtdefs.h:10,
++#                  from /tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32/include/stddef.h:7,
++#                  from /tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32/include/gmp.h:53,
++#                  from conftest.c:10:
++# /tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32/include/_mingw.h:262:2: error: #error Only Win32 target is supported!
++# Currently in ~/build-mingw64-toolchain-ray.broken.svn.latest/build-i686-linux-gnu/gcc-4.7.2/config.log
+ 
+ JOBS=$(( $NUM_CORES * 2 ))
+ 
++# 5166 .. works.. put in ~/build-mingw64-toolchain-ray.working@r5166
++# 5352 .. fails .. binutils .. syslex.l:31:21: error: sysinfo.h: No such file or directory .. http://code.google.com/p/chromium-os/issues/detail?id=21271
++# 5538 .. fails.. i686-w64-mingw32-widl but we look for w64-mingw32-widl!?
+ 
++# pushd /tmp/build-mingw64-toolchain-ray/build-i686-linux-gnu/mingw_w64_tools/
++# /tmp/build-mingw64-toolchain-ray/src/gcc-4.7.2/configure --prefix=/tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32 --disable-shared --with-gmp=/tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32 --with-mpfr=/tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32 --with-mpc=/tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32 --target=i686-w64-mingw32 --enable-targets=all --enable-languages=c,c++ --with-sysroot=/tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32
++
++# since fixing the widl stuff, we get further, had an error installing libgcc though (build_libgcc, re-running and it worked?!)
++# svn@5178 built.
++
++# widl stuff proved more painful, skipping making it work in it's earliest incarnations (program name differences/--with-widl differences)
++# running it gives trouble:
++# error: Could not generate a temp name from /tmp/build-mingw64-toolchain-ray/src/mingw-w64-svn/mingw-w64-headers//tmp/build-mingw64-toolchain-ray/src/mingw-w64-svn/mingw-w64-headers/include/endpointvolume.h.2uVxCd
++#  /tmp/build-mingw64-toolchain-ray/install-i686-linux-gnu/i686-w64-mingw32/bin/i686-w64-mingw32-widl -DBOOL=WINBOOL -I/tmp/build-mingw64-toolchain-ray/src/mingw-w64-svn/mingw-w64-headers/include -I/tmp/build-mingw64-toolchain-ray/src/mingw-w64-svn/mingw-w64-headers/direct-x/include -Icrt -I/tmp/build-mingw64-toolchain-ray/src/mingw-w64-svn/mingw-w64-headers/crt -h -o /tmp/build-mingw64-toolchain-ray/src/mingw-w64-svn/mingw-w64-headers/tmp/build-mingw64-toolchain-ray/src/mingw-w64-svn/mingw-w64-headers/include/audiopolicy.h /tmp/build-mingw64-toolchain-ray/src/mingw-w64-svn/mingw-w64-headers/include/audiopolicy.idl
+ HOST_BINPREFIX=
+ TARGET_ARCH=x86_64
+ TARGET_MULTILIBS=true  # not empty to enable multilib
+@@ -389,17 +426,36 @@ echo "" >> $INSTALL_DIR/README &&
+ echo "The MD5 hashes for the original sources packages are:" >> $INSTALL_DIR/README
+ fail_panic "Could not copy script to installation directory."
+ 
+-download_package http://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.bz2
++download_package ${GMP_URL}gmp-${GMP_VERSION}.tar.bz2
+ download_package http://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_VERSION.tar.bz2
+ download_package http://www.multiprecision.org/mpc/download/mpc-$MPC_VERSION.tar.gz
+ download_package http://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.bz2
+ download_package http://ftp.gnu.org/gnu/gcc/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.bz2
+ 
++# On Fri, 06 Jul 2012 (r5186), nightstrike changed minGW-w64 header layout:
++#  "Install headers to prefix/include instead of prefix/host/include.  This change requires that installers adjust build scripts to set the prefix appropriately if so desired."
++# Assume the new layout here then test for specified revision < 5186 and use $TARGET_TAG instead in this case.
++#PREFIX_REL_HEADER_INST_LOC=.
++PREFIX_FOR_TARGET=$INSTALL_DIR/$TARGET_TAG
++# On Mon, 23 Jul 2012 (r5252), cjacek changed minGW-w64 widl name:
++#  "widl: Use standard, target tripple-based name for installed executable"
++# On Tue, 24 Jul 2012 (r5258), nightstrike changed --with-widl to require the foldername where the executable lives:
++#  "Cleanup discrepancies between r5178 and r5251.  This version should work well now."
++WITH_WIDL=$INSTALL_DIR/bin
+ MINGW_W64_VERSION_NO_REV=$(echo $MINGW_W64_VERSION | awk 'BEGIN { FS="@" }; { print $1 }')
+ if [ "$MINGW_W64_VERSION_NO_REV" = "svn" ];  then
+     MINGW_W64_REVISION=$(echo $MINGW_W64_VERSION | awk 'BEGIN { FS="@" }; { print $2 }')
+     if [ ! -z "$MINGW_W64_REVISION" ] ; then
+-        MINGW_W64_REVISION2=-r$MINGW_W64_REVISION
++	if [ $MINGW_W64_REVISION -lt 5186 ] ; then
++	    PREFIX_FOR_TARGET=$INSTALL_DIR
++#	    PREFIX_REL_HEADER_INST_LOC=$TARGET_TAG
++	fi
++	if [ $MINGW_W64_REVISION -lt 5252 ] ; then
++	    WITH_WIDL=mingw-w64-widl
++	elif [ $MINGW_W64_REVISION -lt 5258 ] ; then
++	    WITH_WIDL=$TARGET_TAG-widl
++	fi
++	MINGW_W64_REVISION2=-r$MINGW_W64_REVISION
+         MINGW_W64_REVISION=@${MINGW_W64_REVISION}
+     fi
+     MINGW_W64_SRC=$SRC_DIR/mingw-w64-svn$MINGW_W64_REVISION2
+@@ -412,6 +468,7 @@ if [ ! -d $MINGW_W64_SRC ]; then
+     if [ "$MINGW_W64_VERSION" = "svn" ];  then
+         echo "Checking out https://mingw-w64.svn.sourceforge.net/svnroot/mingw-w64/trunk$MINGW_W64_REVISION $MINGW_W64_SRC"
+         run svn co https://mingw-w64.svn.sourceforge.net/svnroot/mingw-w64/trunk$MINGW_W64_REVISION $MINGW_W64_SRC
++	(cd $MINGW_W64_SRC; patch -p0 < ~/Dropbox/mingw-and-msys-work/mingw-w64-widl.patch)
+     else
+         download_package http://downloads.sourceforge.net/project/mingw-w64/mingw-w64/mingw-w64-release/mingw-w64-$MINGW_W64_VERSION.tar.gz
+     fi
+@@ -511,22 +568,49 @@ var_append BINUTILS_CONFIGURE_OPTIONS "--with-sysroot=$INSTALL_DIR"
+ 
+ build_host_package binutils-$BINUTILS_VERSION $BINUTILS_CONFIGURE_OPTIONS
+ 
++build_mingw_tools ()
++{
++    local PKGNAME=$1
++    echo "$STAMP_DIR/$PKGNAME"
++    if [ ! -f "$STAMP_DIR/$PKGNAME" ]; then
++	(
++	    mkdir -p $BUILD_DIR/$PKGNAME &&
++	    cd $BUILD_DIR/$PKGNAME &&
++	    log "$PKGNAME: AAAConfiguring" &&
++	    run $MINGW_W64_SRC/mingw-w64-tools/widl/configure --prefix=$INSTALL_DIR --target=$TARGET_TAG
++	    fail_panic "Can't configure mingw-64-tools"
++	    log "$PKGNAME: Installing" &&
++	    run make install -j$JOBS
++	) || exit 1
++	touch $STAMP_DIR/$PKGNAME
++    fi
++}
++
+ # Install the right mingw64 headers into the sysroot
+ build_mingw_headers ()
+ {
+     local PKGNAME=$1
+     if [ ! -f "$STAMP_DIR/$PKGNAME" ]; then
+         (
+-            mkdir -p $BUILD_DIR/$PKGNAME &&
++	VERBOSE=2
++	    # If --with-widl only identifies the program name...
++            if [ $(basename "$WITH_WIDL") = "$WITH_WIDL" ] ; then
++	        # ...then need to add the right path too.
++                export PATH=$PATH:$INSTALL_DIR/bin
++            fi
++	    fail_panic "Can't find widl"
++#	    run ln -s $PREFIX_REL_HEADER_INST_LOC mingw &&
++	    mkdir -p $BUILD_DIR/$PKGNAME &&
+             cd $BUILD_DIR/$PKGNAME &&
+             log "$PKGNAME: Configuring" &&
+-            run $MINGW_W64_SRC/mingw-w64-headers/configure --prefix=$INSTALL_DIR --host=$TARGET_TAG --build=$HOST_TAG
+-            fail_panic "Can't configure mingw-64-headers"
+-
++#	    run $MINGW_W64_SRC/mingw-w64-headers/configure --prefix=$INSTALL_DIR --host=$TARGET_TAG --build=$HOST_TAG --with-widl=$WITH_WIDL --enable-sdk=all
++	    run $MINGW_W64_SRC/mingw-w64-headers/configure --prefix=$PREFIX_FOR_TARGET --host=$TARGET_TAG --build=$HOST_TAG --with-widl=$WITH_WIDL --enable-sdk=all
++	    fail_panic "Can't configure mingw-64-headers"
++	    run make
+             log "$PKGNAME: Installing" &&
+             run make install -j$JOBS &&
+             run cd $INSTALL_DIR && 
+-            run ln -s $TARGET_TAG mingw &&
++	    run ln -s $TARGET_TAG mingw &&
+             run cd $INSTALL_DIR/mingw && 
+             run ln -s lib lib$TARGET_BITS
+             fail_panic "Can't configure mingw-64-headers"
+@@ -597,7 +681,7 @@ build_libgcc ()
+ {
+     local PKGNAME=$1
+     shift
+-
++#VERBOSE=2
+     if [ ! -f "$STAMP_DIR/libgcc-$PKGNAME" ]; then
+         (
+             # No configure step here! We're resuming work that was started
+@@ -625,11 +709,12 @@ fi
+ var_append GCC_CONFIGURE_OPTIONS "--enable-languages=c,c++"
+ var_append GCC_CONFIGURE_OPTIONS "--with-sysroot=$INSTALL_DIR"
+ 
++build_mingw_tools mingw-w64-tools
+ build_mingw_headers mingw-w64-headers
+ 
+ build_core_gcc gcc-$GCC_VERSION $GCC_CONFIGURE_OPTIONS
+ 
+-CRT_CONFIGURE_OPTIONS="--host=$TARGET_TAG --with-sysroot=$INSTALL_DIR --prefix=$INSTALL_DIR"
++CRT_CONFIGURE_OPTIONS="--host=$TARGET_TAG --with-sysroot=$INSTALL_DIR --prefix=$PREFIX_FOR_TARGET"
+ if [ "$TARGET_MULTILIBS" ]; then
+     var_append CRT_CONFIGURE_OPTIONS "--enable-lib32"
+ fi
+diff --git a/build/tools/build-target-prebuilts.sh b/build/tools/build-target-prebuilts.sh
+index 725c5c8..49cabed 100755
+--- a/build/tools/build-target-prebuilts.sh
++++ b/build/tools/build-target-prebuilts.sh
+@@ -29,6 +29,9 @@ register_var_option "--arch=<list>" ARCHS "List of target archs to build for"
+ PACKAGE_DIR=
+ register_var_option "--package-dir=<path>" PACKAGE_DIR "Package toolchain into this directory"
+ 
++VISIBLE_LIBGNUSTL_STATIC=
++register_var_option "--visible-libgnustl-static" VISIBLE_LIBGNUSTL_STATIC "Do not use hidden visibility for libgnustl_static.a"
++
+ register_jobs_option
+ 
+ PROGRAM_PARAMETERS="<toolchain-src-dir>"
+@@ -93,6 +96,9 @@ dump "Building $ABIS stlport binaries..."
+ run $BUILDTOOLS/build-stlport.sh $FLAGS
+ fail_panic "Could not build stlport!"
+ 
++if [ ! -z $VISIBLE_LIBGNUSTL_STATIC ]; then
++    FLAGS=$FLAGS" --visible-libgnustl-static"
++fi
+ dump "Building $ABIS gnustl binaries..."
+ run $BUILDTOOLS/build-gnu-libstdc++.sh $FLAGS "$SRC_DIR"
+ fail_panic "Could not build gnustl!"
+diff --git a/build/tools/common-build-host-funcs.sh b/build/tools/common-build-host-funcs.sh
+index 6e74d30..7c9a001 100644
+--- a/build/tools/common-build-host-funcs.sh
++++ b/build/tools/common-build-host-funcs.sh
+@@ -696,10 +696,13 @@ _bh_select_toolchain_for_host ()
+ #
+ # $1: Build directory. If empty, a random one will be selected.
+ #
+-# $2: Either 'preserve' or 'remove'. Indicates what to do of
+-#     existing files in the build directory, if any.
++# Other behaviour controlling variables:
+ #
+-# $3: Either 'release' or 'debug'. Compilation mode.
++#  _BH_OPTION_FORCE: Either 'preserve' or 'remove'. Indicates what to do of
++#                    existing files in the build directory, if any.
++#
++#  _BH_OPTION_NO_STRIP: Sets BH_BUILD_MODE to either 'release' or
++#                    'debug'. Compilation mode.
+ #
+ bh_setup_build_dir ()
+ {
+@@ -764,7 +767,7 @@ bh_setup_build_for_host ()
+ # generate host-specific binaries. You should call it before invoking
+ # a configure script or make.
+ #
+-# It assume sthat bh_setup_build_for_host was called with the right
++# It assumes that bh_setup_build_for_host was called with the right
+ # host system tag and wrappers directory.
+ #
+ bh_setup_host_env ()
+diff --git a/build/tools/dev-defaults.sh b/build/tools/dev-defaults.sh
+index ea3099f..ce27cfe 100644
+--- a/build/tools/dev-defaults.sh
++++ b/build/tools/dev-defaults.sh
+@@ -186,13 +186,20 @@ get_toolchain_name_list_for_arch ()
+ # binutils was reverted to 2.19, to ensure at least
+ # feature/bug compatibility.
+ #
+-# $1: toolchain with version numer (e.g. 'arm-linux-androideabi-4.6')
++# $1: toolchain with version number (e.g. 'arm-linux-androideabi-4.6')
+ #
+ get_default_binutils_version_for_gcc ()
+ {
++#    echo "2.22"
++# I'd like to keep this as-per Google, but 2.19 doesn't build on MinGW-w64 v2.0.7 due to
++# inline asprintf definition:-
++# /tmp/necessitas/android-qt-ndk/toolchain-source/binutils/binutils-2.19/libiberty/asprintf.c:47:1: error: redefinition of 'asprintf'
++# /home/ray/src/necessitas/host_compiler_tools/mingw/i686-w64-mingw32/bin/../lib/gcc/i686-w64-mingw32/4.7.2/../../../../i686-w64-mingw32/include/stdio.h:309:5: note: previous definition of 'asprintf' was here
++# And if I'm switching 4.4.3 to 2.22, then I may as well do the same for 4.6!
++# ... actually, gdb-7.3.x also fails in the same way, so the best thing to do is figure out which svn rev. to get such that it includes the same change made in 5166 (#if 0'ing of the asprintf, v-2.0.7 (rev5471) *doesn't* have this?!)
+     case $1 in
+         arm-*-4.4.3|x86-4.4.3|x86-*-4.4.3) echo "2.19";;
+-        arm-*-4.7|x86-4.7|x86-*-4.7|mipsel-*-4.7) echo "2.22";;
++        arm-*-4.7|x86-4.7|x86-*-4.7|mipsel-*-4.7|*-4.8) echo "2.22";;
+         *) echo "$DEFAULT_BINUTILS_VERSION";;
+     esac
+ }

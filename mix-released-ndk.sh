@@ -67,7 +67,7 @@ download_package ()
     if [ ! -f "$ARCHIVE_DIR/$PKG_NAME" ]; then
         log "Downloading $PKG_URL..."
         (cd $ARCHIVE_DIR && run curl -L -o "$PKG_NAME" "$PKG_URL")
-        fail_panic "Can't download '$PKG_URL'"
+#        fail_panic "Can't download '$PKG_URL'"
     fi
 
     if [ ! -d "$SRC_DIR/$PKG_BASENAME" ]; then
@@ -201,113 +201,131 @@ mkdir -p $SRC_DIR
 BUILD_DIR=/tmp/necessitas
 NDK="$BUILD_DIR"/android-qt-ndk/ndk
 
-#SYSTEMS="linux windows darwin"
-SYSTEMS="linux"
-#SYSTEMS="windows darwin"
-#SYSTEMS="darwin"
+SYSTEMS="linux windows darwin"
 
 # Must be some of "default", "x86", "x86_64" or "both"
-HOST_ARCHES="default"
+#HOST_ARCHES="default"
+HOST_ARCHES="both"
 # x86 is currently broken (prefix is i686-linux-android instead of i686-android-linux)
 TARG_ARCHES="x86 mips arm"
 # TARG_ARCHES="arm mips"
 # TARG_ARCHES="arm"
-SRC_REVISION="r8b"
+SRC_REVISION="r8d"
 DATESUFFIX=$(date +%y%m%d)
 RELEASE_FOLDER=release-$DATESUFFIX
+# Otherwise it mixes them together.
+AN_NDK_PER_HOST_ARCH=1
+# Form some comma separated lists.
+# ARCHIVE_NAME,
+#for SYSTEM in $SYSTEMS; do
 
 for SYSTEM in $SYSTEMS; do
-    GOOGLES_ARCHIVE="http://dl.google.com/android/ndk/android-ndk-${SRC_REVISION}-$(system_name_to_ndk_release_name $SYSTEM).$(system_name_to_archive_extension $SYSTEM)"
-    download_package $GOOGLES_ARCHIVE DST_FOLDER
-    DST_FOLDER=${DST_FOLDER}/android-ndk-${SRC_REVISION}
-    cp -rvf $NDK/build/* $DST_FOLDER/build/*
-    # We'll rename this back at the end.
-    if [ "$SYSTEM" = "windows" ] ; then
-      WINDOWS_FOLDERS=$(find $DST_FOLDER -name "windows")
-      for WINDOWS_FOLDER in $WINDOWS_FOLDERS; do
-        mv $WINDOWS_FOLDER $(dirname $WINDOWS_FOLDER)/windows-x86
-      done
-    fi
+    NEW_ARCHIVE=android-ndk-${SRC_REVISION}-ma-$(system_name_to_ndk_release_name $SYSTEM).7z
+    if [ ! -f ${RELEASE_FOLDER}/${NEW_ARCHIVE} ]; then
+        GOOGLES_ARCHIVE="http://dl.google.com/android/ndk/android-ndk-${SRC_REVISION}-$(system_name_to_ndk_release_name $SYSTEM).$(system_name_to_archive_extension $SYSTEM)"
+        download_package $GOOGLES_ARCHIVE DST_FOLDER
+        DST_FOLDER=${DST_FOLDER}/android-ndk-${SRC_REVISION}
+        cp -rvf $NDK/build/* $DST_FOLDER/build/
+        cp -rvf $NDK/*py* $DST_FOLDER/
+        if [ "$SYSTEM" = "windows" ] ; then
+          WINDOWS_FOLDERS=$(find $DST_FOLDER -name "windows")
+          for WINDOWS_FOLDER in $WINDOWS_FOLDERS; do
+            mv $WINDOWS_FOLDER $(dirname $WINDOWS_FOLDER)/windows-x86
+          done
+        fi
 
-    # For comparison.
-    # cp -rf $DST_FOLDER/toolchains $DST_FOLDER/toolchains-google
+        # For comparison.
+        # cp -rf $DST_FOLDER/toolchains $DST_FOLDER/toolchains-google
 
-    if [ "$HOST_ARCHES" = "default" ] ; then
-        HOST_ARCHES="x86"
-    elif [ "$HOST_ARCHES" = "both" ] ; then
-        HOST_ARCHES="x86 x86_64"
-    fi
-    for HOST_ARCH in $HOST_ARCHES; do
-        # Target arch independent.
-        PYTHON_DLLS=
-        TAR_BZ2S="          "$(find $PWD/$RELEASE_FOLDER -path "*/python-*-${SYSTEM}-${HOST_ARCH}.tar.bz2")
-        TAR_BZ2S="$TAR_BZ2S "$(find $PWD/$RELEASE_FOLDER -path "*/*lib*.tar.bz2")
-        for TAR_BZ2 in $TAR_BZ2S; do
-            THIS_DST_FOLDER=$DST_FOLDER/$(package_name_to_final_folder_suffix_name $TAR_BZ2)
-            mkdir -p $THIS_DST_FOLDER
-            tar -xjf "$TAR_BZ2" -C "$THIS_DST_FOLDER"
-            PYTHON_DLLS=$(find $THIS_DST_FOLDER -path "*python*.dll")
-        done
-        # Target arch dependent.
-        for TARG_ARCH in $TARG_ARCHES; do
-            GDBSERVER_BZ2=$(find $PWD/$RELEASE_FOLDER -path "*/${TARG_ARCH}-gdbserver*.tar.bz2")
-            echo GDBSERVER_BZ2 is $GDBSERVER_BZ2
-            echo tar -xjf "$GDBSERVER_BZ2" --strip-components=3 -C "$DST_FOLDER/prebuilt/android-$TARG_ARCH/gdbserver/"
-            tar -xjf "$GDBSERVER_BZ2" --strip-components=3 -C "$DST_FOLDER/prebuilt/android-$TARG_ARCH/gdbserver/"
-            TARG_ARCH_FOLDER_NAME=$(system_name_to_final_folder_name $TARG_ARCH)
-            # These bits will end up in the 'right' place - the toolchains themselves.
-            TARG_TBZ2=$(system_name_to_final_folder_name $TARG_ARCH)
-            TAR_BZ2S=$(find $PWD/$RELEASE_FOLDER -path "*/${TARG_TBZ2}-*-${SYSTEM}-${HOST_ARCH}.tar.bz2")
-            echo TAR_BZ2S $TAR_BZ2S
-            TOOLCHAIN_FOLDERS=
+        if [ "$HOST_ARCHES" = "default" ] ; then
+            HOST_ARCHES="x86"
+        elif [ "$HOST_ARCHES" = "both" ] ; then
+            HOST_ARCHES="x86 x86_64"
+        fi
+        for HOST_ARCH in $HOST_ARCHES; do
+            SYSTEM_FOLDER=${SYSTEM}-${HOST_ARCH}
+            # Target arch independent.
+            PYTHON_DLLS=
+            TAR_BZ2S="          "$(find $PWD/$RELEASE_FOLDER -path "*/python-*-${SYSTEM}-${HOST_ARCH}.tar.bz2")
+            TAR_BZ2S="$TAR_BZ2S "$(find $PWD/$RELEASE_FOLDER -path "*/*lib*.tar.bz2")
             for TAR_BZ2 in $TAR_BZ2S; do
-                TEMP=$(basename $TAR_BZ2)
-                SUFFIX=-${SYSTEM}-${HOST_ARCH}.tar.bz2
-                TOOLCHAIN_FOLDERS="$TOOLCHAIN_FOLDERS "${TEMP%%$SUFFIX}
                 THIS_DST_FOLDER=$DST_FOLDER/$(package_name_to_final_folder_suffix_name $TAR_BZ2)
                 mkdir -p $THIS_DST_FOLDER
                 tar -xjf "$TAR_BZ2" -C "$THIS_DST_FOLDER"
+                PYTHON_DLLS=$(find $THIS_DST_FOLDER -path "$DST_FOLDER/prebuilt/${SYSTEM_FOLDER}/*python*.dll")
+                echo PYTHON_DLLS is $PYTHON_DLLS
             done
-            echo TOOLCHAIN_FOLDERS is $TOOLCHAIN_FOLDERS
-            # These bits won't, so we extract them for each toolchain, ignoring the top level folder.
-            # This means gdb (and gdbserver) are duplicated multiple times.
-            GDB_BZ2S=$(find $PWD/$RELEASE_FOLDER -path "*/gdb-$(system_name_to_final_folder_name "${TARG_ARCH}")-*-${SYSTEM}-${HOST_ARCH}.tar.bz2")
-            echo GDB_BZ2S is $GDB_BZ2S
-            for TOOLCHAIN_FOLDER in $TOOLCHAIN_FOLDERS; do
-                for GDB_BZ2 in $GDB_BZ2S; do
-                    THIS_DST_FOLDER=$DST_FOLDER/$(package_name_to_final_folder_suffix_name $GDB_BZ2)
-                    echo tar -xjvf "$GDB_BZ2" --strip-components=1 -C "$THIS_DST_FOLDER/$TOOLCHAIN_FOLDER"
-                    tar -xjf "$GDB_BZ2" --strip-components=1 -C "$THIS_DST_FOLDER/$TOOLCHAIN_FOLDER"
+            # Target arch dependent.
+            for TARG_ARCH in $TARG_ARCHES; do
+                GDBSERVER_BZ2=$(find $PWD/$RELEASE_FOLDER -path "*/${TARG_ARCH}-gdbserver*.tar.bz2")
+                echo GDBSERVER_BZ2 is $GDBSERVER_BZ2
+                echo tar -xjf "$GDBSERVER_BZ2" --strip-components=3 -C "$DST_FOLDER/prebuilt/android-$TARG_ARCH/gdbserver/"
+                tar -xjf "$GDBSERVER_BZ2" --strip-components=3 -C "$DST_FOLDER/prebuilt/android-$TARG_ARCH/gdbserver/"
+                TARG_ARCH_FOLDER_NAME=$(system_name_to_final_folder_name $TARG_ARCH)
+                # These bits will end up in the 'right' place - the toolchains themselves.
+                TARG_TBZ2=$(system_name_to_final_folder_name $TARG_ARCH)
+                TAR_BZ2S=$(find $PWD/$RELEASE_FOLDER -path "*/${TARG_TBZ2}-*-${SYSTEM}-${HOST_ARCH}.tar.bz2")
+                echo TAR_BZ2S $TAR_BZ2S
+                TOOLCHAIN_FOLDERS=
+                for TAR_BZ2 in $TAR_BZ2S; do
+                    TEMP=$(basename $TAR_BZ2)
+                    SUFFIX=-${SYSTEM}-${HOST_ARCH}.tar.bz2
+                    TOOLCHAIN_FOLDERS="$TOOLCHAIN_FOLDERS "${TEMP%%$SUFFIX}
+                    THIS_DST_FOLDER=$DST_FOLDER/$(package_name_to_final_folder_suffix_name $TAR_BZ2)
+                    mkdir -p $THIS_DST_FOLDER
+                    tar -xjf "$TAR_BZ2" -C "$THIS_DST_FOLDER"
                 done
-                if [ ! -z "$PYTHON_DLLS" ] ; then
-                    GDB_PATH=$(dirname $(find $THIS_DST_FOLDER/$TOOLCHAIN_FOLDER -name "*gdb.exe"))
-                    cp $PYTHON_DLLS $GDB_PATH
-                fi
+                echo TOOLCHAIN_FOLDERS is $TOOLCHAIN_FOLDERS
+                # These bits won't, so we extract them for each toolchain, ignoring the top level folder.
+                # This means gdb (and gdbserver) are duplicated multiple times.
+                GDB_BZ2S=$(find $PWD/$RELEASE_FOLDER -path "*/gdb-$(system_name_to_final_folder_name "${TARG_ARCH}")-*-${SYSTEM}-${HOST_ARCH}.tar.bz2")
+                echo GDB_BZ2S is $GDB_BZ2S
+                for TOOLCHAIN_FOLDER in $TOOLCHAIN_FOLDERS; do
+                    for GDB_BZ2 in $GDB_BZ2S; do
+                        THIS_DST_FOLDER=$DST_FOLDER/$(package_name_to_final_folder_suffix_name $GDB_BZ2)
+                        echo tar -xjvf "$GDB_BZ2" --strip-components=1 -C "${THIS_DST_FOLDER}${TOOLCHAIN_FOLDER}"
+                        tar -xjf "$GDB_BZ2" --strip-components=1 -C "${THIS_DST_FOLDER}${TOOLCHAIN_FOLDER}"
+                    done
+                    if [ ! -z "$PYTHON_DLLS" ]; then
+                        GDB_PATH=$(dirname $(find ${THIS_DST_FOLDER}${TOOLCHAIN_FOLDER}/prebuilt/${SYSTEM_FOLDER} -name "*gdb.exe"))
+                        echo GDB_PATH is $GDB_PATH
+                        cp $PYTHON_DLLS $GDB_PATH
+                    fi
+                done
             done
         done
-    done
 
-    if [ "$SYSTEM" = "windows" ] ; then
-      WINDOWS_FOLDERS=$(find $DST_FOLDER -name "windows-x86")
-      for WINDOWS_FOLDER in $WINDOWS_FOLDERS; do
-        mv $WINDOWS_FOLDER $(dirname $WINDOWS_FOLDER)/windows
-      done
+        # Rename windows-x86 back to windows.
+        if [ "$SYSTEM" = "windows" ] ; then
+          WINDOWS_FOLDERS=$(find $DST_FOLDER -name "windows-x86")
+          for WINDOWS_FOLDER in $WINDOWS_FOLDERS; do
+            mv $WINDOWS_FOLDER $(dirname $WINDOWS_FOLDER)/windows
+          done
+        fi
+
+        # Replace symlinks with the files and make the final 7z.
+        PACK_TEMP=$PWD/pack_temp
+        rm -rf $PACK_TEMP
+        mkdir $PACK_TEMP
+
+        # On Windows, we end up with a broken link from ld to ld.bfd (broken due to no .exe, and target file missing anyway)
+        #  so just delete any missing links.
+        LINKS=$(find $DST_FOLDER -type l)
+        for LINK in $LINKS; do
+            if [ $(LINKT=$(readlink "$LINK")) ] ; then
+                echo "Deleting non-existant link $LINK to $LINKT"
+                rm $LINK
+            fi
+        done
+
+        pushd $DST_FOLDER/../
+            tar -hcf - android-ndk-${SRC_REVISION} | tar -xf - -C $PACK_TEMP
+        popd
+
+        pushd $PACK_TEMP
+           7za a -mx=9 ${NEW_ARCHIVE} * > /dev/null
+           mv ${NEW_ARCHIVE} ../${RELEASE_FOLDER}/
+           echo Done, see ../${RELEASE_FOLDER}/${NEW_ARCHIVE}
+        popd
     fi
-
-    # Replace symlinks with the files and make the final 7z.
-    PACK_TEMP=$PWD/pack_temp
-    rm -rf $PACK_TEMP
-    mkdir $PACK_TEMP
-
-    pushd $DST_FOLDER/../
-        tar -hcf - android-ndk-${SRC_REVISION} | tar -xf - -C $PACK_TEMP
-    popd
-
-    pushd $PACK_TEMP
-       NEW_ARCHIVE=android-ndk-${SRC_REVISION}-ma-$(system_name_to_ndk_release_name $SYSTEM).7z
-       7za a -mx=9 ${NEW_ARCHIVE} * > /dev/null
-       mv ${NEW_ARCHIVE} ../${RELEASE_FOLDER}/
-       echo Done, see ../${RELEASE_FOLDER}/${NEW_ARCHIVE}
-    popd
-
 done

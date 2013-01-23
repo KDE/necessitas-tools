@@ -29,7 +29,6 @@ GCC_VER_LINARO=4.6-2012.07
 GCC_VER_LINARO_MAJOR=4.6
 GCC_VER_LINARO_LOCAL=4.6.3
 ARCHES="arm,mips,x86"
-#ARCHES="arm"
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
@@ -38,16 +37,16 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
       echo "You may need to run $HOME/setup.sh in your chroot env"
       exit 1
    fi
-   TEST_BUILD_ARCH=$(arch)
-   case $TEST_BUILD_ARCH in
-   i?86*)
-      ;;
-    *)
-      echo "Warning, you are on a $TEST_BUILD_ARCH machine"
-      echo "it *might* be safer to run this via linux32,"
-      echo "but it'll probably be fine."
-      ;;
-   esac
+#   TEST_BUILD_ARCH=$(arch)
+#   case $TEST_BUILD_ARCH in
+#   i?86*)
+#      ;;
+#    *)
+#      echo "Warning, you are on a $TEST_BUILD_ARCH machine"
+#      echo "it *might* be safer to run this via linux32,"
+#      echo "but it'll probably be fine."
+#      ;;
+#   esac
 fi
 
 # We need a newer MSYS expr.exe and we need it early in this process.
@@ -69,21 +68,19 @@ fi
 
 case $OSTYPE_MAJOR in
     linux*)
-# All of 'em
+        # Linux is the only build machine on which all host toolchains can be built.
         SYSTEMS=linux-x86,linux-x86_64,windows-x86,windows-x86_64,darwin-x86,darwin-x86_64
-#        SYSTEMS=linux-x86
         NUM_CORES=$(grep -c -e '^processor' /proc/cpuinfo)
         BUILD_OS="linux"
         ;;
     darwin|freebsd)
-#       SYSTEMS=darwin-x86,windows-x86
-        SYSTEMS=darwin-x86
+        SYSTEMS=darwin-x86,darwin-x86_64
         NUM_CORES=`sysctl -n hw.ncpu`
         BUILD_OS="darwin"
         ;;
     windows|msys|cygwin)
         export PATH=$BUILD_DIR/bin:$PATH
-        SYSTEMS=darwin-x86,windows-x86
+        SYSTEMS=darwin-x86,darwin-x86_64,windows-x86,windows-x86_64
         NUM_CORES=$NUMBER_OF_PROCESSORS
         BUILD_OS="windows"
         ;;
@@ -358,10 +355,8 @@ build_windows_programs "$BUILD_DIR_TMP" "$BUILD_DIR" "$PWD/misc-patches"
 NDK_TOP="$BUILD_DIR"/android-qt-ndk
 NDK=$NDK_TOP/ndk
 if [ ! -d $NDK ] ; then
-  git clone http://anongit.kde.org/android-qt-ndk.git $NDK
-  (cd $NDK; git checkout -b ndk-r8d-fixes -t origin/ndk-r8d-fixes)
-#  git clone https://android.googlesource.com/platform/ndk.git $NDK
-#  (cd $NDK; git checkout -b ndk-r8d-fixes)
+  git clone https://android.googlesource.com/platform/ndk $NDK
+  (pushd $NDK; patch -p1 < $PROGDIR/ndk-patches/0001-lots-of-various-fixes.patch)
   fail_panic "Couldn't clone ndk"
 fi
 if [ ! -d $NDK_TOP/development ] ; then
@@ -523,18 +518,7 @@ PACKAGE_DIR=$PWD/release-$DATESUFFIX
 
 mkdir -p $PACKAGE_DIR
 
-if [ "1" = "1" ] ; then
-#  --no-strip \
-#  --force-gold-build \
-#  --default-ld=gold \
-$NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
-  --gmp-version=5.0.5 \
-  --systems="$SYSTEMS" \
-  --build-dir=$GCC_BUILD_DIR \
-  --package-dir=$PACKAGE_DIR \
-    $ARCHES_BY_VERSIONS \
-   -j$JOBS
-
+# Build Python first as it's (currently) the most likely thing to fail.
 SYSTEMSLIST=$(commas_to_spaces $SYSTEMS)
 if [ "$(bh_list_contains $BUILD_OS-$BUILD_ARCH $SYSTEMSLIST)" = "no" ] ; then
   log "Adding $BUILD_OS-$BUILD_ARCH for Python build"
@@ -544,20 +528,30 @@ else
 fi
 
 $NDK/build/tools/build-host-python.sh --toolchain-src-dir=$TC_SRC_DIR \
-  --systems="$SYSTEMSPY" \
   --build-dir=$PYTHON_BUILD_DIR \
+  --systems="$SYSTEMSPY" \
   --package-dir=$PACKAGE_DIR \
   --python-version=2.7.3 \
    -j$JOBS
 
 fail_panic "build-host-python.sh failed"
 
-$NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
+#  --no-strip \
+#  --force-gold-build \
+#  --default-ld=gold \
+$NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
+  --build-dir=$GCC_BUILD_DIR \
+  --gmp-version=5.0.5 \
   --systems="$SYSTEMS" \
+  --package-dir=$PACKAGE_DIR \
+    $ARCHES_BY_VERSIONS \
+   -j$JOBS
+
+$NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
   --build-dir=$GDB_BUILD_DIR \
+  --systems="$SYSTEMS" \
   --package-dir=$PACKAGE_DIR \
   --gdb-version=7.3.x \
-  --build-dir=$GDB_BUILD_DIR \
   --arch=$ARCHES \
   --python-build-dir=$PYTHON_BUILD_DIR \
   --python-version=2.7.3 \
@@ -565,21 +559,10 @@ $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
 
 rm -rf /tmp/ndk-$USER/build/gdbserver*
 
-# CAN'T CURRENTLY BUILD MIPS LIBS OR GDBSERVER!
-#ARCHES_WITHOUT_MIPS=$(bh_list_remove mips $LIST_ARCHES)
-#if [ "$LIST_ARCHES" != "$ARCHES_WITHOUT_MIPS" ]; then
-#    echo "WARNING :: Removed mips from build-target-prebuilts.sh"
-#    echo "        :: to avoid error:"
-#    echo "        ::  collect2: cannot find 'ld'"
-#fi
-#ARCHES_WITHOUT_MIPS=$(spaces_to_commas $ARCHES_WITHOUT_MIPS)
-ARCHES_WITHOUT_MIPS=$ARCHES
-fi
-
 $NDK/build/tools/build-target-prebuilts.sh \
   --ndk-dir=$NDK \
   --arch="$ARCHES_WITHOUT_MIPS" \
-  --build-dir=$TARGET_BUILD_DIR \
   --package-dir=$PWD/release-$DATESUFFIX \
+  --visible-libgnustl-static \
     $TC_SRC_DIR \
   -j$JOBS
