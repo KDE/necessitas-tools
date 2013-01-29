@@ -1,21 +1,21 @@
-From 4ee7918bb8c8285366df4961459a7726c3283500 Mon Sep 17 00:00:00 2001
+From 9a46205f2311382b5f4b0f5cad13d687dbc453bb Mon Sep 17 00:00:00 2001
 From: Ray Donnelly <mingw.android@gmail.com>
 Date: Mon, 28 Jan 2013 23:01:43 +0000
-Subject: [PATCH] Various (ncurses for Win gdb, modernize mingw-w64, hacks)
+Subject: [PATCH] PDCurses ncurses for Win gdb, modernize mingw-w64, hacks
 
 ---
  build/core/init.mk                                 |   4 +-
  build/core/ndk-common.sh                           |   7 +-
- build/tools/build-gnu-libstdc++.sh                 |  17 ++-
- build/tools/build-host-gcc.sh                      | 140 +++++++++++++++------
- build/tools/build-host-gdb.sh                      |  64 +++++++++-
+ build/tools/build-gnu-libstdc++.sh                 |  17 +-
+ build/tools/build-host-gcc.sh                      | 140 ++++++++++++-----
+ build/tools/build-host-gdb.sh                      | 172 ++++++++++++++++++++-
  build/tools/build-host-python.sh                   |   3 +-
- build/tools/build-mingw64-toolchain.sh             | 105 ++++++++++++++--
+ build/tools/build-mingw64-toolchain.sh             | 105 +++++++++++--
  build/tools/build-target-prebuilts.sh              |   6 +
  build/tools/common-build-host-funcs.sh             |  11 +-
  build/tools/dev-defaults.sh                        |  11 +-
- ...001-disable-windows-termcap-if-enable-tui.patch |  34 +++++
- 11 files changed, 335 insertions(+), 67 deletions(-)
+ ...001-disable-windows-termcap-if-enable-tui.patch |  34 ++++
+ 11 files changed, 442 insertions(+), 68 deletions(-)
  create mode 100644 build/tools/toolchain-patches/gdb/0001-disable-windows-termcap-if-enable-tui.patch
 
 diff --git a/build/core/init.mk b/build/core/init.mk
@@ -470,7 +470,7 @@ index 469eced..a0f598c 100755
      done
      echo "Done. See the content of $PACKAGE_DIR:"
 diff --git a/build/tools/build-host-gdb.sh b/build/tools/build-host-gdb.sh
-index 4727439..81cbd1f 100755
+index 4727439..ad8ea95 100755
 --- a/build/tools/build-host-gdb.sh
 +++ b/build/tools/build-host-gdb.sh
 @@ -144,7 +144,7 @@ build_expat ()
@@ -482,30 +482,63 @@ index 4727439..81cbd1f 100755
  
      ARGS=" --prefix=$INSTALLDIR"
      ARGS=$ARGS" --disable-shared --enable-static"
-@@ -167,6 +167,56 @@ need_build_expat ()
+@@ -166,6 +166,152 @@ need_build_expat ()
+     bh_stamps_do host-expat-$1 build_expat $1
  }
  
- # $1: host system tag
++# For gdb --tui on Windows, ncurses or PDCurses is needed. So far, I've been
++# unable to get ncurses (5.9 or 5.9-20130126) to work despite a trying a lot
++# of different configure options. --disable-database and --with-fallbacks is
++# probably the closest to working as it'll avoid the need for a share folder
++# full of terminfo definitions; instead linking them statically. By contrast
++# PDCurses worked first time! I would prefer to use ncurses though.
++WIN_CURSES_USE_IMPLEMENTATION=pdcurses # or ncurses
++WIN_CURSES_AVOID_SHARE_FOLDER=yes
++WIN_CURSES_NCURSES_VER=5.9 # or latest
++
++# $1: host system tag
++# 5.9 was released on 4-4-2011, but there's been a lot of fixes since then:
++# http://invisible-island.net/ncurses/NEWS.html
++
++# http://invisible-island.net/datafiles/current/ncurses.tar.gz
 +build_ncurses ()
 +{
-+    local VER=5.9
++    if [ "$WIN_CURSES_NCURSES_VER" = "latest" ]; then
++        local VER=-5.9-20130126
++        local NCURSES_URL=ftp://invisible-island.net/ncurses/current
++        local EXT=tgz
++    else
++        local VER=-${WIN_CURSES_NCURSES_VER}
++        local NCURSES_URL=http://ftp.gnu.org/pub/gnu/ncurses
++        local EXT=tar.gz
++    fi
++
 +    local ARGS
 +    local SRCDIR=$TOOLCHAIN_SRC_DIR/ncurses
-+    local BUILDDIR=$BH_BUILD_DIR/build-ncurses-$VER-$1
++    local BUILDDIR=$BH_BUILD_DIR/build-ncurses${VER}-$1
 +    local INSTALLDIR=$BH_BUILD_DIR/install-host-$1
 +
 +    prepare_download
 +    mkdir -p ${SRCDIR}
-+    download_file http://ftp.gnu.org/pub/gnu/ncurses/ncurses-$VER.tar.gz ${SRCDIR}/ncurses-$VER.tar.gz
-+    tar -xzf ${SRCDIR}/ncurses-$VER.tar.gz -C ${SRCDIR}
++    download_file ${NCURSES_URL}/ncurses${VER}.${EXT} ${SRCDIR}/ncurses${VER}.${EXT}
++    tar -xzf ${SRCDIR}/ncurses${VER}.${EXT} -C ${SRCDIR}
 +
-+    ARGS=" --prefix=$INSTALLDIR"
++    WIDE=no
++
++    ARGS="      --prefix=$INSTALLDIR"
++    if [ "$WIDE" = "yes" ]; then
++        ARGS=$ARGS" --enable-widec"
++    fi
 +    ARGS=$ARGS" --disable-shared --enable-static"
++    ARGS=$ARGS" --without-debug"
 +    ARGS=$ARGS" --build=$BH_BUILD_CONFIG"
 +    ARGS=$ARGS" --host=$BH_HOST_CONFIG"
 +    ARGS=$ARGS" --enable-term-driver"
 +    ARGS=$ARGS" --enable-sp-funcs"
-+    ARGS=$ARGS" --enable-widec"
++    if [ "$WIN_CURSES_AVOID_SHARE_FOLDER" = "yes" ]; then
++        ARGS=$ARGS" --disable-database"
++        ARGS=$ARGS" --with-fallbacks=Eterm,cygwin,linux,rxvt,rxvt-unicode,screen,screen-256color,vt100,xterm,xterm-color,xterm-256color,pcansi,ansi,dumb,putty,putty-256color"
++    fi
 +    ARGS=$ARGS" CFLAGS=-D__USE_MINGW_ANSI_STDIO=1"
 +
 +    TEXT="$(bh_host_text) ncurses:"
@@ -513,11 +546,12 @@ index 4727439..81cbd1f 100755
 +    mkdir -p "$BUILDDIR" && rm -rf "$BUILDDIR"/* &&
 +    cd "$BUILDDIR" &&
 +    dump "$TEXT Building"
-+    run2 "$SRCDIR"/ncurses-$VER/configure $ARGS &&
++    run2 "$SRCDIR"/ncurses${VER}/configure $ARGS &&
 +    run2 make -j$NUM_JOBS &&
 +    run2 make -j$NUM_JOBS install
 +
 +    # After http://www.linuxfromscratch.org/lfs/view/development/chapter06/ncurses.html
++    if [ "$WIDE" = "yes" -a ! -f libncurses.a ]; then
 +    (
 +    cd "$INSTALLDIR"/lib
 +    for lib in ncurses form panel menu ; do
@@ -527,6 +561,7 @@ index 4727439..81cbd1f 100755
 +    cd "$INSTALLDIR"/include
 +    ln -sfv ncursesw ncurses
 +    )
++    fi
 +
 +}
 +
@@ -535,11 +570,72 @@ index 4727439..81cbd1f 100755
 +    bh_stamps_do host-ncurses-$1 build_ncurses $1
 +}
 +
++install_ncurses ()
++{
++    bh_stamps_do host-ncurses-$1 build_ncurses $1
++
++    local INSTALLDIR=$BH_BUILD_DIR/install-host-$1
++    local FINALINSTALLDIR=$(gdb_build_install_dir $1 $2 $3) # We need to copy the share folder from INSTALLDIR to FINALINSTALLDIR
++    if [ "$WIN_CURSES_AVOID_SHARE_FOLDER" = "no" ]; then
++        (
++        if [ ! -d $FINALINSTALLDIR/share/gdb ]; then
++            mkdir -p $FINALINSTALLDIR/share/gdb
++        fi
++        cp -rf "$INSTALLDIR"/share/terminfo "$FINALINSTALLDIR"/share/gdb
++        cp -rf "$INSTALLDIR"/share/tabset   "$FINALINSTALLDIR"/share/gdb
++        )
++    fi
++}
++
++need_install_ncurses ()
++{
++    bh_stamps_do host-install-ncurses-$1-$2-$3 install_ncurses $1 $2 $3
++}
++
 +# $1: host system tag
++build_pdcurses ()
++{
++    local VER=3.4
++    local ARGS
++    local SRCDIR=$TOOLCHAIN_SRC_DIR/PDCurses
++    local BUILDDIR=$BH_BUILD_DIR/build-pdcurses-$VER-$1
++    local INSTALLDIR=$BH_BUILD_DIR/install-host-$1
++
++    mkdir -p ${INSTALLDIR}/include
++    mkdir -p ${INSTALLDIR}/lib
++
++    prepare_download
++    mkdir -p ${SRCDIR}
++    download_file http://downloads.sourceforge.net/pdcurses/pdcurses/${VER}/PDCurses-${VER}.tar.gz ${SRCDIR}/PDCurses-${VER}.tar.gz
++    tar -xzf ${SRCDIR}/PDCurses-${VER}.tar.gz -C ${SRCDIR}
++    mkdir -p "$BUILDDIR" &&
++    cp -rf ${SRCDIR}/PDCurses-${VER} ${BUILDDIR} &&
++    dump "$TEXT Building"
++
++    (
++    cd ${BUILDDIR}/PDCurses-${VER}/win32
++    sed '90s/-copy/-cp/' < mingwin32.mak > mingwin32-fixed.mak
++    # AR isn't used in the below!
++    make -f mingwin32-fixed.mak WIDE=Y UTF8=Y DLL=N CC="$CC" CXX="$CXX" AR="$AR" RANLIB="$RANLIB"
++    $RANLIB pdcurses.a
++    cp pdcurses.a ${INSTALLDIR}/lib/libncurses.a
++    cp pdcurses.a ${INSTALLDIR}/lib/libpanel.a
++    sed 's/\#define PDC_BUILD 3401/\#define PDC_BUILD 3401\n#define _ISPAD 0x10/' < ../curses.h > ../curses.fixed.h
++    sed 's/\#define PDC_BUILD 3401/\#define PDC_BUILD 3401\n#define _ISPAD 0x10/' < ../panel.h > ../panel.fixed.h
++    cp ../curses.fixed.h ${INSTALLDIR}/include/ncurses.h
++    cp ../panel.fixed.h ${INSTALLDIR}/include/panel.h
++    )
++}
++
++need_build_pdcurses ()
++{
++    bh_stamps_do host-pdcurses-$1 build_pdcurses $1
++}
++
+ # $1: host system tag
  # $2: target tag
  # $3: gdb version
- build_host_gdb ()
-@@ -184,7 +234,7 @@ build_host_gdb ()
+@@ -184,7 +330,7 @@ build_host_gdb ()
      bh_setup_host_env
  
      need_build_expat $1
@@ -548,7 +644,7 @@ index 4727439..81cbd1f 100755
  
      ARGS=" --prefix=$INSTALLDIR"
      ARGS=$ARGS" --disable-shared"
-@@ -194,6 +244,7 @@ build_host_gdb ()
+@@ -194,6 +340,7 @@ build_host_gdb ()
      ARGS=$ARGS" --disable-werror"
      ARGS=$ARGS" --disable-nls"
      ARGS=$ARGS" --disable-docs"
@@ -556,12 +652,16 @@ index 4727439..81cbd1f 100755
      ARGS=$ARGS" --with-expat=$EXPATPREFIX"
      if [ "$PYTHON_VERSION" ]; then
          ARGS=$ARGS" --with-python=$(python_build_install_dir $BH_HOST_TAG)/bin/python-config.sh"
-@@ -204,6 +255,13 @@ build_host_gdb ()
+@@ -204,6 +351,17 @@ build_host_gdb ()
          fi
      fi
  
 +    if [ $1 = windows-x86 -o $1 = windows-x86_64 ]; then
-+        need_build_ncurses $1
++        if [ "$WIN_CURSES_USE_IMPLEMENTATION" = "pdcurses" ]; then
++            need_build_pdcurses $1
++        else
++            need_install_ncurses $1 $2 $3
++        fi
 +    fi
 +
 +    # Needed for expat/ncurses when cross compiling.
@@ -570,7 +670,23 @@ index 4727439..81cbd1f 100755
      TEXT="$(bh_host_text) gdb-$BH_TARGET_ARCH-$3:"
  
      mkdir -p "$BUILDDIR" && rm -rf "$BUILDDIR"/* &&
-@@ -280,7 +338,7 @@ if [ "$PACKAGE_DIR" ]; then
+@@ -235,8 +393,14 @@ install_host_gdb ()
+     dump "$(bh_host_text) gdb-$BH_TARGET_ARCH-$3: Installing"
+     run copy_directory "$SRCDIR/bin" "$DSTDIR/bin"
+     if [ -d "$SRCDIR/share/gdb" ]; then
+-        run copy_directory "$SRCDIR/share/gdb" "$DSTDIR/share/gdb"
++        run copy_directory "$SRCDIR/share/gdb"      "$DSTDIR/share/gdb"
+     fi
++#    if [ -d "$SRCDIR/share/terminfo" ]; then
++#        run copy_directory "$SRCDIR/share/terminfo" "$DSTDIR/share/terminfo"
++#    fi
++#    if [ -d "$SRCDIR/share/tabset" ]; then
++#        run copy_directory "$SRCDIR/share/tabset"   "$DSTDIR/share/tabset"
++#    fi
+ }
+ 
+ need_install_host_gdb ()
+@@ -280,7 +444,7 @@ if [ "$PACKAGE_DIR" ]; then
          bh_setup_build_for_host $SYSTEM
          for ARCH in $ARCHS; do
              for VERSION in $GDB_VERSION; do

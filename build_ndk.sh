@@ -357,7 +357,7 @@ NDK=$NDK_TOP/ndk
 if [ ! -d $NDK ] ; then
   # git clone http://anongit.kde.org/android-qt-ndk.git $NDK
   git clone https://android.googlesource.com/platform/ndk $NDK
-  (pushd $NDK; patch -p1 < $PROGDIR/ndk-patches/0001-Various-ncurses-for-Win-gdb-modernize-mingw-w64-hack.patch)
+  (pushd $NDK; patch -p1 < $PROGDIR/ndk-patches/0001-PDCurses-ncurses-for-Win-gdb-modernize-mingw-w64-hac.patch)
   fail_panic "Couldn't clone ndk"
 fi
 if [ ! -d $NDK_TOP/development ] ; then
