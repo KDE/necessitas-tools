@@ -355,8 +355,9 @@ build_windows_programs "$BUILD_DIR_TMP" "$BUILD_DIR" "$PWD/misc-patches"
 NDK_TOP="$BUILD_DIR"/android-qt-ndk
 NDK=$NDK_TOP/ndk
 if [ ! -d $NDK ] ; then
+  # git clone http://anongit.kde.org/android-qt-ndk.git $NDK
   git clone https://android.googlesource.com/platform/ndk $NDK
-  (pushd $NDK; patch -p1 < $PROGDIR/ndk-patches/0001-lots-of-various-fixes.patch)
+  (pushd $NDK; patch -p1 < $PROGDIR/ndk-patches/0001-Various-ncurses-for-Win-gdb-modernize-mingw-w64-hack.patch)
   fail_panic "Couldn't clone ndk"
 fi
 if [ ! -d $NDK_TOP/development ] ; then

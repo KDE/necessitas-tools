@@ -1,3 +1,23 @@
+From 4ee7918bb8c8285366df4961459a7726c3283500 Mon Sep 17 00:00:00 2001
+From: Ray Donnelly <mingw.android@gmail.com>
+Date: Mon, 28 Jan 2013 23:01:43 +0000
+Subject: [PATCH] Various (ncurses for Win gdb, modernize mingw-w64, hacks)
+
+---
+ build/core/init.mk                                 |   4 +-
+ build/core/ndk-common.sh                           |   7 +-
+ build/tools/build-gnu-libstdc++.sh                 |  17 ++-
+ build/tools/build-host-gcc.sh                      | 140 +++++++++++++++------
+ build/tools/build-host-gdb.sh                      |  64 +++++++++-
+ build/tools/build-host-python.sh                   |   3 +-
+ build/tools/build-mingw64-toolchain.sh             | 105 ++++++++++++++--
+ build/tools/build-target-prebuilts.sh              |   6 +
+ build/tools/common-build-host-funcs.sh             |  11 +-
+ build/tools/dev-defaults.sh                        |  11 +-
+ ...001-disable-windows-termcap-if-enable-tui.patch |  34 +++++
+ 11 files changed, 335 insertions(+), 67 deletions(-)
+ create mode 100644 build/tools/toolchain-patches/gdb/0001-disable-windows-termcap-if-enable-tui.patch
+
 diff --git a/build/core/init.mk b/build/core/init.mk
 index 9b4e28a..d435f25 100644
 --- a/build/core/init.mk
@@ -450,19 +470,107 @@ index 469eced..a0f598c 100755
      done
      echo "Done. See the content of $PACKAGE_DIR:"
 diff --git a/build/tools/build-host-gdb.sh b/build/tools/build-host-gdb.sh
-index 4727439..72549a9 100755
+index 4727439..81cbd1f 100755
 --- a/build/tools/build-host-gdb.sh
 +++ b/build/tools/build-host-gdb.sh
-@@ -203,6 +203,8 @@ build_host_gdb ()
-             CXXFLAGS=$CXXFLAGS" -D__USE_MINGW_ANSI_STDIO=1"
+@@ -144,7 +144,7 @@ build_expat ()
+     local ARGS
+     local SRCDIR=$TOOLCHAIN_SRC_DIR/expat/expat-2.0.1
+     local BUILDDIR=$BH_BUILD_DIR/build-expat-2.0.1-$1
+-    local INSTALLDIR=$BH_BUILD_DIR/install-expat-2.0.1-$1
++    local INSTALLDIR=$BH_BUILD_DIR/install-host-$1
+ 
+     ARGS=" --prefix=$INSTALLDIR"
+     ARGS=$ARGS" --disable-shared --enable-static"
+@@ -167,6 +167,56 @@ need_build_expat ()
+ }
+ 
+ # $1: host system tag
++build_ncurses ()
++{
++    local VER=5.9
++    local ARGS
++    local SRCDIR=$TOOLCHAIN_SRC_DIR/ncurses
++    local BUILDDIR=$BH_BUILD_DIR/build-ncurses-$VER-$1
++    local INSTALLDIR=$BH_BUILD_DIR/install-host-$1
++
++    prepare_download
++    mkdir -p ${SRCDIR}
++    download_file http://ftp.gnu.org/pub/gnu/ncurses/ncurses-$VER.tar.gz ${SRCDIR}/ncurses-$VER.tar.gz
++    tar -xzf ${SRCDIR}/ncurses-$VER.tar.gz -C ${SRCDIR}
++
++    ARGS=" --prefix=$INSTALLDIR"
++    ARGS=$ARGS" --disable-shared --enable-static"
++    ARGS=$ARGS" --build=$BH_BUILD_CONFIG"
++    ARGS=$ARGS" --host=$BH_HOST_CONFIG"
++    ARGS=$ARGS" --enable-term-driver"
++    ARGS=$ARGS" --enable-sp-funcs"
++    ARGS=$ARGS" --enable-widec"
++    ARGS=$ARGS" CFLAGS=-D__USE_MINGW_ANSI_STDIO=1"
++
++    TEXT="$(bh_host_text) ncurses:"
++
++    mkdir -p "$BUILDDIR" && rm -rf "$BUILDDIR"/* &&
++    cd "$BUILDDIR" &&
++    dump "$TEXT Building"
++    run2 "$SRCDIR"/ncurses-$VER/configure $ARGS &&
++    run2 make -j$NUM_JOBS &&
++    run2 make -j$NUM_JOBS install
++
++    # After http://www.linuxfromscratch.org/lfs/view/development/chapter06/ncurses.html
++    (
++    cd "$INSTALLDIR"/lib
++    for lib in ncurses form panel menu ; do
++        rm -vf lib${lib}.a
++        ln -sfv lib${lib}w.a lib${lib}.a
++    done
++    cd "$INSTALLDIR"/include
++    ln -sfv ncursesw ncurses
++    )
++
++}
++
++need_build_ncurses ()
++{
++    bh_stamps_do host-ncurses-$1 build_ncurses $1
++}
++
++# $1: host system tag
+ # $2: target tag
+ # $3: gdb version
+ build_host_gdb ()
+@@ -184,7 +234,7 @@ build_host_gdb ()
+     bh_setup_host_env
+ 
+     need_build_expat $1
+-    local EXPATPREFIX=$BH_BUILD_DIR/install-expat-2.0.1-$1
++    local EXPATPREFIX=$BH_BUILD_DIR/install-host-$1
+ 
+     ARGS=" --prefix=$INSTALLDIR"
+     ARGS=$ARGS" --disable-shared"
+@@ -194,6 +244,7 @@ build_host_gdb ()
+     ARGS=$ARGS" --disable-werror"
+     ARGS=$ARGS" --disable-nls"
+     ARGS=$ARGS" --disable-docs"
++    ARGS=$ARGS" --enable-tui"
+     ARGS=$ARGS" --with-expat=$EXPATPREFIX"
+     if [ "$PYTHON_VERSION" ]; then
+         ARGS=$ARGS" --with-python=$(python_build_install_dir $BH_HOST_TAG)/bin/python-config.sh"
+@@ -204,6 +255,13 @@ build_host_gdb ()
          fi
      fi
-+    # Needed for expat when cross compiling.
-+    CFLAGS=$CFLAGS"   -I${BH_BUILD_DIR}/install-expat-2.0.1-$1/include -L${BH_BUILD_DIR}/install-expat-2.0.1-$1/lib"
  
++    if [ $1 = windows-x86 -o $1 = windows-x86_64 ]; then
++        need_build_ncurses $1
++    fi
++
++    # Needed for expat/ncurses when cross compiling.
++    CFLAGS=$CFLAGS"   -I${BH_BUILD_DIR}/install-host-$1/include -L${BH_BUILD_DIR}/install-host-$1/lib"
++
      TEXT="$(bh_host_text) gdb-$BH_TARGET_ARCH-$3:"
  
-@@ -280,7 +282,7 @@ if [ "$PACKAGE_DIR" ]; then
+     mkdir -p "$BUILDDIR" && rm -rf "$BUILDDIR"/* &&
+@@ -280,7 +338,7 @@ if [ "$PACKAGE_DIR" ]; then
          bh_setup_build_for_host $SYSTEM
          for ARCH in $ARCHS; do
              for VERSION in $GDB_VERSION; do
@@ -760,3 +868,46 @@ index ea3099f..ce27cfe 100644
          *) echo "$DEFAULT_BINUTILS_VERSION";;
      esac
  }
+diff --git a/build/tools/toolchain-patches/gdb/0001-disable-windows-termcap-if-enable-tui.patch b/build/tools/toolchain-patches/gdb/0001-disable-windows-termcap-if-enable-tui.patch
+new file mode 100644
+index 0000000..8f099f5
+--- /dev/null
++++ b/build/tools/toolchain-patches/gdb/0001-disable-windows-termcap-if-enable-tui.patch
+@@ -0,0 +1,34 @@
++diff -urN a/gdb-7.3.x/gdb/configure b/gdb-7.3.x/gdb/configure
++--- a/gdb-7.3.x/gdb/configure	2013-01-28 22:50:00.404289961 +0000
+++++ b/gdb-7.3.x/gdb/configure	2013-01-28 22:55:25.028070996 +0000
++@@ -9752,8 +9752,10 @@
++     ac_cv_search_tgetent="none required"
++     ;;
++   *mingw32*)
++-    ac_cv_search_tgetent="none required"
++-    CONFIG_OBS="$CONFIG_OBS windows-termcap.o"
+++    if test x"$enable_tui" = xno; then
+++      ac_cv_search_tgetent="none required"
+++      CONFIG_OBS="$CONFIG_OBS windows-termcap.o"
+++    fi
++     ;;
++ esac
++ 
++diff -urN a/gdb-7.3.x/gdb/configure.ac b/gdb-7.3.x/gdb/configure.ac
++--- a/gdb-7.3.x/gdb/configure.ac	2013-01-28 22:49:59.825285005 +0000
+++++ b/gdb-7.3.x/gdb/configure.ac	2013-01-28 22:55:25.023070953 +0000
++@@ -557,9 +557,11 @@
++   go32* | *djgpp*)
++     ac_cv_search_tgetent="none required"
++     ;;
++-  *mingw32*)	 
++-    ac_cv_search_tgetent="none required"
++-    CONFIG_OBS="$CONFIG_OBS windows-termcap.o"
+++  *mingw32*)
+++    if test x"$enable_tui" = xno; then
+++      ac_cv_search_tgetent="none required"
+++      CONFIG_OBS="$CONFIG_OBS windows-termcap.o"
+++    fi
++     ;;
++ esac
++ 
+-- 
+1.7.11.7
+
