@@ -30,6 +30,11 @@ GCC_VER_LINARO_MAJOR=4.6
 GCC_VER_LINARO_LOCAL=4.6.3
 ARCHES="arm,mips,x86"
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
+export PATH=$PATH:$HOST_TOOLS/darwin/apple-osx/bin
+PATH=$PATH:$HOST_TOOLS/darwin/apple-osx/bin
+DARWIN_SYSROOT=$HOST_TOOLS/darwin/MacOSX10.7.sdk
+DARWIN_TOOLCHAIN=i686-apple-darwin11
+export DARWIN_SYSROOT DARWIN_TOOLCHAIN
 
 if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
    if [ ! -d /proc ] ; then
