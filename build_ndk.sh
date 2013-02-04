@@ -582,7 +582,7 @@ rm -rf /tmp/ndk-$USER/build/gdbserver*
 
 $NDK/build/tools/build-target-prebuilts.sh \
   --ndk-dir=$NDK \
-  --arch="$ARCHES_WITHOUT_MIPS" \
+  --arch="$ARCHES" \
   --package-dir=$PWD/release-$DATESUFFIX \
   --visible-libgnustl-static \
     $TC_SRC_DIR \

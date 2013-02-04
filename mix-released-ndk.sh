@@ -3,6 +3,8 @@
 HELP=
 VERBOSE=1
 
+set -e
+
 # This will be reset later.
 LOG_FILE=/dev/null
 
