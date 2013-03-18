@@ -185,7 +185,7 @@ int main(int argc, char *argv[])
             QFile::link(QString("android-%1").arg(androdPlatform), QString("android-%1").arg(symLink));
         QFile outXmlFile(xmlPath);
         outXmlFile.open(QIODevice::WriteOnly);
-        outXmlFile.write(QString("<libs version=\"%1\" applicationParameters=\"%2\" environmentVariables=\"%3\" loaderClassName=\"%4\" qtVersion=\"%5\">\n")
+        outXmlFile.write(QString("<libs flags=\"0\" version=\"%1\" applicationParameters=\"%2\" environmentVariables=\"%3\" loaderClassName=\"%4\" qtVersion=\"%5\">\n")
 					.arg(version)
 					.arg(applicationParameters)
 					.arg(environmentVariables)
