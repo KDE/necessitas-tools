@@ -15,7 +15,7 @@ LOG_FILE=/dev/null
 HELP=
 VERBOSE=1
 
-NDK_VER=r8d
+NDK_VER=r8e
 DATESUFFIX=$(date +%y%m%d)
 # This must be the same as TEMP_PATH in build_sdk.sh
 if [ "$OSTYPE_MAJOR" = "msys" ] ; then
@@ -364,19 +364,15 @@ if [ ! -d $NDK ] ; then
   # git clone http://anongit.kde.org/android-qt-ndk.git $NDK
   git clone https://android.googlesource.com/platform/ndk $NDK
   (pushd $NDK;
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/10/51010/2 && git cherry-pick FETCH_HEAD # gnu-libstdc++: --visible-libgnustl-static option
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/01/51001/1 && git cherry-pick FETCH_HEAD # Remove redundant, stale shell fn from build-host-gcc.sh
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/02/51002/1 && git cherry-pick FETCH_HEAD # build-host-gcc.sh: --build-dir option
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/20/51020/1 && git cherry-pick FETCH_HEAD # build-host-gcc.sh: Simplify and fix gold enable/disable-ment
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/03/51003/1 && git cherry-pick FETCH_HEAD # build-host-gcc.sh: --disable-plugins --disable-plugin globally
+  set -x
+# The change below is controvertial, Pavel Chupin says it's not needed, but I disagree.
+#    git fetch https://android.googlesource.com/platform/ndk refs/changes/03/51003/1 && git cherry-pick FETCH_HEAD # build-host-gcc.sh: --disable-plugins --disable-plugin globally
 #   If https://android-review.googlesource.com/#/c/51005/ is not merged then we need to use:
 #   git fetch https://android.googlesource.com/platform/ndk refs/changes/03/51003/2 && git cherry-pick FETCH_HEAD
 #   ...as soon as it is merged, we can go back to Patch version 1.
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/11/51011/1 && git cherry-pick FETCH_HEAD # build-host-gcc.sh: enable libgomp where possible (ARM > 4.4.3)
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/12/51012/1 && git cherry-pick FETCH_HEAD # Windows: Update build-mingw64-toolchain.sh for modern versions.
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/04/51004/1 && git cherry-pick FETCH_HEAD # build-host-gdb.sh: Fix expat prefix
     patch -p1 < $PROGDIR/ndk-patches/0001-PDCurses-ncurses-for-Win-gdb.patch
     patch -p1 < $PROGDIR/ndk-patches/0002-Hacks.patch
+    patch -p1 < $PROGDIR/ndk-patches/0003-optimised-host-tools.patch
     )
   fail_panic "Couldn't clone ndk"
 fi
@@ -535,6 +531,9 @@ GCC_BUILD_DIR=$BUILD_DIR_TMP/build/host-gcc
 PYTHON_BUILD_DIR=$BUILD_DIR_TMP/build/host-python
 GDB_BUILD_DIR=$BUILD_DIR_TMP/build/host-gdb
 TARGET_BUILD_DIR=$BUILD_DIR_TMP/build/target
+# I should add --build-dir option to the target build scripts really.
+export NDK_TMPDIR="$TARGET_BUILD_DIR"
+
 PACKAGE_DIR=$PWD/release-$DATESUFFIX
 
 mkdir -p $PACKAGE_DIR

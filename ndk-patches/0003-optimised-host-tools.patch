@@ -1,0 +1,34 @@
+diff --git a/build/tools/build-host-gcc.sh b/build/tools/build-host-gcc.sh
+index c91fa71..58df536 100755
+--- a/build/tools/build-host-gcc.sh
++++ b/build/tools/build-host-gcc.sh
+@@ -846,6 +846,12 @@ select_toolchain_for_host ()
+         DST_PREFIX="$NDK_CCACHE $HOST_FULLPREFIX"
+     fi
+ 
++    # Optimized host binaries?
++    if [ -z "$NO_STRIP" ]; then
++        HOST_CFLAGS=$HOST_CFLAGS" -O2 -s -Wno-error"
++        HOST_CXXFLAGS=$HOST_CXXFLAGS" -O2 -s -Wno-error"
++    fi
++
+     # We're going to generate a wrapper toolchain with the $HOST prefix
+     # i.e. if $HOST is 'i686-linux-gnu', then we're going to generate a
+     # wrapper toolchain named 'i686-linux-gnu-gcc' that will redirect
+diff --git a/build/tools/common-build-host-funcs.sh b/build/tools/common-build-host-funcs.sh
+index 6e74d30..ca49437 100644
+--- a/build/tools/common-build-host-funcs.sh
++++ b/build/tools/common-build-host-funcs.sh
+@@ -671,6 +671,12 @@ _bh_select_toolchain_for_host ()
+         CCACHE="--ccache=$NDK_CCACHE"
+     fi
+ 
++    # Optimized host binaries?
++    if [ -z "$NO_STRIP" ]; then
++        HOST_CFLAGS=$HOST_CFLAGS" -O2 -s -Wno-error"
++        HOST_CXXFLAGS=$HOST_CXXFLAGS" -O2 -s -Wno-error"
++    fi
++
+     # We're going to generate a wrapper toolchain with the $HOST prefix
+     # i.e. if $HOST is 'i686-linux-gnu', then we're going to generate a
+     # wrapper toolchain named 'i686-linux-gnu-gcc' that will redirect
