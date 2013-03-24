@@ -94,25 +94,16 @@ download_package ()
     eval $2=\"$SRC_DIR/$PKG_BASENAME\"
 }
 
-# Returns
+# Returns the name of the NDK archive.
 # $1 is system
 # $2 is arch (or nothing)
 system_name_to_ndk_release_name ()
 {
     local _ARCH
-    if [ ! -z "$2" -a ! "$2" = "default" ] ; then
-        _ARCH = -$2
+    if [ -z "$2"  ] ; then
+        _ARCH=
     else
-        case $1 in
-            linux)
-            _ARCH=-x86
-            ;;
-            darwin)
-            _ARCH=-x86
-            ;;
-            *)
-            ;;
-        esac
+        _ARCH=-$2
     fi
     case $1 in
         linux)
@@ -212,7 +203,7 @@ HOST_ARCHES="both"
 TARG_ARCHES="x86 mips arm"
 # TARG_ARCHES="arm mips"
 # TARG_ARCHES="arm"
-SRC_REVISION="r8d"
+SRC_REVISION="r8e"
 DATESUFFIX=$(date +%y%m%d)
 RELEASE_FOLDER=release-$DATESUFFIX
 # Otherwise it mixes them together.
@@ -222,29 +213,29 @@ AN_NDK_PER_HOST_ARCH=1
 #for SYSTEM in $SYSTEMS; do
 
 for SYSTEM in $SYSTEMS; do
-    NEW_ARCHIVE=android-ndk-${SRC_REVISION}-ma-$(system_name_to_ndk_release_name $SYSTEM).7z
-    if [ ! -f ${RELEASE_FOLDER}/${NEW_ARCHIVE} ]; then
-        GOOGLES_ARCHIVE="http://dl.google.com/android/ndk/android-ndk-${SRC_REVISION}-$(system_name_to_ndk_release_name $SYSTEM).$(system_name_to_archive_extension $SYSTEM)"
-        download_package $GOOGLES_ARCHIVE DST_FOLDER
-        DST_FOLDER=${DST_FOLDER}/android-ndk-${SRC_REVISION}
-        cp -rvf $NDK/build/* $DST_FOLDER/build/
-        cp -rvf $NDK/*py* $DST_FOLDER/
-        if [ "$SYSTEM" = "windows" ] ; then
-          WINDOWS_FOLDERS=$(find $DST_FOLDER -name "windows")
-          for WINDOWS_FOLDER in $WINDOWS_FOLDERS; do
-            mv $WINDOWS_FOLDER $(dirname $WINDOWS_FOLDER)/windows-x86
-          done
-        fi
+    if [ "$HOST_ARCHES" = "default" ] ; then
+        HOST_ARCHES="x86"
+    elif [ "$HOST_ARCHES" = "both" ] ; then
+        HOST_ARCHES="x86 x86_64"
+    fi
 
-        # For comparison.
-        # cp -rf $DST_FOLDER/toolchains $DST_FOLDER/toolchains-google
+    for HOST_ARCH in $HOST_ARCHES; do
+        NEW_ARCHIVE=android-ndk-${SRC_REVISION}-ma-$(system_name_to_ndk_release_name $SYSTEM $HOST_ARCH).7z
+        if [ ! -f ${RELEASE_FOLDER}/${NEW_ARCHIVE} ]; then
+            GOOGLES_ARCHIVE="http://dl.google.com/android/ndk/android-ndk-${SRC_REVISION}-$(system_name_to_ndk_release_name $SYSTEM $HOST_ARCH).$(system_name_to_archive_extension $SYSTEM)"
+            download_package $GOOGLES_ARCHIVE DST_FOLDER
+            DST_FOLDER=${DST_FOLDER}/android-ndk-${SRC_REVISION}
+            cp -rvf $NDK/build/* $DST_FOLDER/build/
+            cp -rvf $NDK/*py* $DST_FOLDER/
+            if [ "$SYSTEM" = "windows" ] ; then
+              WINDOWS_FOLDERS=$(find $DST_FOLDER -name "windows")
+              for WINDOWS_FOLDER in $WINDOWS_FOLDERS; do
+                mv $WINDOWS_FOLDER $(dirname $WINDOWS_FOLDER)/windows-x86
+              done
+            fi
 
-        if [ "$HOST_ARCHES" = "default" ] ; then
-            HOST_ARCHES="x86"
-        elif [ "$HOST_ARCHES" = "both" ] ; then
-            HOST_ARCHES="x86 x86_64"
-        fi
-        for HOST_ARCH in $HOST_ARCHES; do
+            # For comparison.
+            # cp -rf $DST_FOLDER/toolchains $DST_FOLDER/toolchains-google
             SYSTEM_FOLDER=${SYSTEM}-${HOST_ARCH}
             # Target arch independent.
             PYTHON_DLLS=
@@ -295,39 +286,31 @@ for SYSTEM in $SYSTEMS; do
                     fi
                 done
             done
-        done
 
-        # Rename windows-x86 back to windows.
-        if [ "$SYSTEM" = "windows" ] ; then
-          WINDOWS_FOLDERS=$(find $DST_FOLDER -name "windows-x86")
-          for WINDOWS_FOLDER in $WINDOWS_FOLDERS; do
-            mv $WINDOWS_FOLDER $(dirname $WINDOWS_FOLDER)/windows
-          done
+            # Replace symlinks with the files and make the final 7z.
+            PACK_TEMP=$PWD/pack_temp
+            rm -rf $PACK_TEMP
+            mkdir $PACK_TEMP
+
+            # On Windows, we end up with a broken link from ld to ld.bfd (broken due to no .exe, and target file missing anyway)
+            #  so just delete any missing links.
+            LINKS=$(find $DST_FOLDER -type l)
+            for LINK in $LINKS; do
+                if [ $(LINKT=$(readlink "$LINK")) ] ; then
+                    echo "Deleting non-existant link $LINK to $LINKT"
+                    rm $LINK
+                fi
+            done
+
+            pushd $DST_FOLDER/../
+                tar -hcf - android-ndk-${SRC_REVISION} | tar -xf - -C $PACK_TEMP
+            popd
+
+            pushd $PACK_TEMP
+               7za a -mx=9 ${NEW_ARCHIVE} * > /dev/null
+               mv ${NEW_ARCHIVE} ../${RELEASE_FOLDER}/
+               echo Done, see ../${RELEASE_FOLDER}/${NEW_ARCHIVE}
+            popd
         fi
-
-        # Replace symlinks with the files and make the final 7z.
-        PACK_TEMP=$PWD/pack_temp
-        rm -rf $PACK_TEMP
-        mkdir $PACK_TEMP
-
-        # On Windows, we end up with a broken link from ld to ld.bfd (broken due to no .exe, and target file missing anyway)
-        #  so just delete any missing links.
-        LINKS=$(find $DST_FOLDER -type l)
-        for LINK in $LINKS; do
-            if [ $(LINKT=$(readlink "$LINK")) ] ; then
-                echo "Deleting non-existant link $LINK to $LINKT"
-                rm $LINK
-            fi
-        done
-
-        pushd $DST_FOLDER/../
-            tar -hcf - android-ndk-${SRC_REVISION} | tar -xf - -C $PACK_TEMP
-        popd
-
-        pushd $PACK_TEMP
-           7za a -mx=9 ${NEW_ARCHIVE} * > /dev/null
-           mv ${NEW_ARCHIVE} ../${RELEASE_FOLDER}/
-           echo Done, see ../${RELEASE_FOLDER}/${NEW_ARCHIVE}
-        popd
-    fi
+    done
 done

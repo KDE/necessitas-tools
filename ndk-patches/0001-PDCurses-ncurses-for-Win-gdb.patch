@@ -126,7 +126,7 @@ index 2c3f91c..0abcbb7 100755
 +
 +    prepare_download
 +    mkdir -p ${SRCDIR}
-+    download_file http://downloads.sourceforge.net/pdcurses/pdcurses/${VER}/PDCurses-${VER}.tar.gz ${SRCDIR}/PDCurses-${VER}.tar.gz
++    download_file http://garr.dl.sourceforge.net/project/pdcurses/pdcurses/${VER}/PDCurses-${VER}.tar.gz ${SRCDIR}/PDCurses-${VER}.tar.gz
 +    tar -xzf ${SRCDIR}/PDCurses-${VER}.tar.gz -C ${SRCDIR}
 +    mkdir -p "$BUILDDIR" &&
 +    cp -rf ${SRCDIR}/PDCurses-${VER} ${BUILDDIR} &&
