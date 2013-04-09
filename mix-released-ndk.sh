@@ -5,6 +5,16 @@ VERBOSE=1
 
 set -e
 
+uname_bt() {
+	local _UNAME=$(uname -s)
+	case "$_UNAME" in
+	 "MINGW"*)
+		_UNAME=Windows
+		;;
+	esac
+	echo $_UNAME
+}
+
 longest_common_prefix () {
   local prefix= n
   ## Truncate the two strings to the minimum of their lengths
