@@ -5,6 +5,176 @@ VERBOSE=1
 
 set -e
 
+longest_common_prefix () {
+  local prefix= n
+  ## Truncate the two strings to the minimum of their lengths
+  if [[ ${#1} -gt ${#2} ]]; then
+    set -- "${1:0:${#2}}" "$2"
+  else
+    set -- "$1" "${2:0:${#1}}"
+  fi
+  ## Binary search for the first differing character, accumulating the common prefix
+  while [[ ${#1} -gt 1 ]]; do
+    n=$(((${#1}+1)/2))
+    if [[ ${1:0:$n} == ${2:0:$n} ]]; then
+      prefix=$prefix${1:0:$n}
+      set -- "${1:$n}" "${2:$n}"
+    else
+      set -- "${1:0:$n}" "${2:0:$n}"
+    fi
+  done
+  ## Add the one remaining character, if common
+  if [[ $1 = $2 ]]; then prefix=$prefix$1; fi
+  printf %s "$prefix"
+}
+
+longest_common_prefix_n () {
+    local _ACCUM=""
+    local _PREFIXES="$1"
+    for PREFIX in $_PREFIXES
+    do
+        if [[ -z $_ACCUM ]] ; then
+            _ACCUM=$PREFIX
+        else
+            _ACCUM=$(longest_common_prefix $_ACCUM $PREFIX)
+        fi
+    done
+    printf %s "$_ACCUM"
+}
+
+archive_type_for_host() {
+    local _HOST=$1
+    if [[ -z $_HOST ]] ; then
+        HOST=$(uname_bt)
+    fi
+
+    if [[ "$HOST" = "Linux" ]] ; then
+	echo tar.xz
+	return 0
+    elif [[ "$HOST" = "Windows" ]] ; then
+	echo 7z
+	return 0
+    else
+	echo 7z
+	return 0
+    fi
+}
+
+# $1 == folder(s) to compress (quoted, must all be relative to the working directory)
+# $2 == dirname with prefix for filename of output (i.e. without extensions)
+# $3 == Either xz, bz2, 7z, Windows, Linux, Darwin or nothing
+# Returns the name of the compressed file.
+compress_folders() {
+
+    local _FOLDERS="$1"
+    local _COMMONPREFIX=""
+    local _FOLDERSABS
+
+    set -x
+    echo called compress_folders $1 $2 $3
+
+    # Special case: if a single folder is passed in and it ends with a ., then
+    # we don't want the actual folder itself to appear in the archive.
+    if [[ ${#_FOLDERS[@]} = 1 ]] && [[ $(basename "$1") = . ]] ; then
+        pushd $1 > /dev/null
+        _COMMONPREFIX=$PWD
+        popd > /dev/null
+	_RELFOLDERS=$(basename "$_FOLDERSABS")
+    else
+        for FOLDER in $_FOLDERS
+        do
+            if [[ ! -d $FOLDER ]] ; then
+                echo "Folder $FOLDER doesn't exist"
+                return 1
+            fi
+            pushd $FOLDER > /dev/null
+            _FOLDERSABS="$_FOLDERSABS "$PWD
+            popd > /dev/null
+        done
+
+        local _COMMONPREFIX=$(longest_common_prefix_n "$_FOLDERSABS")
+        echo _COMMONPREFIX is $_COMMONPREFIX
+
+        if [[ ${#_FOLDERSABS[@]} = 1 ]] ; then
+            _COMMONPREFIX=$(dirname "$_FOLDERSABS")
+            _RELFOLDERS=$(basename "$_FOLDERSABS")
+        else
+            local _RELFOLDERS=
+            for FOLDER in $_FOLDERSABS
+            do
+                _RELFOLDERS="$_RELFOLDERS "${FOLDER#$_COMMONPREFIX}
+            done
+        fi
+    fi
+
+    local _OUTFILE=$2
+    if [[ "$(basename $_OUTFILE)" = "$_OUTFILE" ]] ; then
+	_OUTFILE=$PWD/$_OUTFILE
+    fi
+
+    local _ARCFMT=$3
+
+    if [[ -z "$_ARCFMT" ]] ; then
+	_ARCFMT=$(uname_bt)
+    fi
+
+    if [[ "$_ARCFMT" = "Windows" ]] ; then
+	_ARCFMT="7z"
+    elif [[ "$_ARCFMT" = "Darwin" ]] ; then
+	# I'd prefer to use xar (but see below) or tar.xz, but can't, because:
+	# 1. Neither lzma nor xz are compiled into the Darwin version.
+	# 2. It compresses each file individually.
+	# 3. xz doesn't exist by default on Darwin - neither does 7z, but I've
+	#    put a binary up on http://code.google.com/p/mingw-and-ndk/
+	# ..meaning with xar --compression-args=9 -cjf, my Darwin cross
+	#   compilers end up being ~71MB compared to ~19MB as a 7z
+	#   which is too vast a difference for me to ignore.
+	_ARCFMT="7z"
+    elif [[ "$_ARCFMT" = "Linux" ]] ; then
+	_ARCFMT="xz"
+    fi
+
+    pushd $_COMMONPREFIX > /dev/null
+#    pushd $1 > /dev/null
+    if [[ "$_ARCFMT" == "7z" ]] ; then
+        find $_RELFOLDERS -maxdepth 1 -mindepth 0 \( ! -path "*.git*" \) -exec sh -c "exec echo {} " \; > /tmp/$$.txt
+    else
+        # Usually, sorting by the filename part of the full path yields better compression.
+        find $_RELFOLDERS -type f \( ! -path "*.git*" \) -exec sh -c "echo \$(basename {}; echo {} ) " \; | sort | awk '{print $2;}' > /tmp/$$.txt
+        tar -c --files-from=/tmp/$$.txt -f /tmp/$(basename $2).tar
+    fi
+
+    if [[ "$_ARCFMT" == "xz" ]] ; then
+        _ARCEXT=".tar.xz"
+    elif [[ "$_ARCFMT" == "bz2" ]] ; then
+        _ARCEXT=".tar.bz2"
+    else
+        _ARCEXT="."$_ARCFMT
+    fi
+
+    if [[ -f $_OUTFILE$_ARCEXT ]] ; then
+        rm -rf $_OUTFILE$_ARCEXT > /dev/null
+    fi
+
+    if [[ "$_ARCFMT" == "xz" ]] ; then
+        _ARCEXT=".tar.xz"
+        echo $PWD
+        echo xz -z -9 -e -c -q /tmp/$(basename $2).tar > $_OUTFILE$_ARCEXT
+	xz -z -9 -e -c -q /tmp/$(basename $2).tar > $_OUTFILE$_ARCEXT
+    elif [[ "$_ARCFMT" == "bz2" ]] ; then
+        _ARCEXT=".tar.bz2"
+	bzip2 -z -9 -c -q /tmp/$(basename $2).tar > $_OUTFILE$_ARCEXT
+    elif [[ "$_ARCFMT" == "xar" ]] ; then
+	# I'd like to use xz or lzma, but xar -caf results in "lzma support not compiled in."
+	xar --compression-args=9 -cjf $_OUTFILE$_ARCEXT $(cat /tmp/$$.txt)
+    else
+	7za a -mx=9 $_OUTFILE$_ARCEXT $(cat /tmp/$$.txt) > /dev/null
+    fi
+    echo $_OUTFILE$_ARCEXT
+    popd > /dev/null
+    return 0
+}
+
 # This will be reset later.
 LOG_FILE=/dev/null
 
@@ -118,6 +288,24 @@ system_name_to_ndk_release_name ()
     esac
 }
 
+system_name_to_ma_ndk_release_extension ()
+{
+    case $1 in
+        linux)
+            echo "tar.xz"
+            return
+        ;;
+        darwin)
+            echo "7z"
+            return
+        ;;
+        windows)
+            echo "7z"
+            return
+        ;;
+    esac
+}
+
 system_name_to_archive_extension ()
 {
     case $1 in
@@ -220,7 +408,7 @@ for SYSTEM in $SYSTEMS; do
     fi
 
     for HOST_ARCH in $HOST_ARCHES; do
-        NEW_ARCHIVE=android-ndk-${SRC_REVISION}-ma-$(system_name_to_ndk_release_name $SYSTEM $HOST_ARCH).7z
+        NEW_ARCHIVE=android-ndk-${SRC_REVISION}-ma-$(system_name_to_ndk_release_name $SYSTEM $HOST_ARCH).$(system_name_to_ma_ndk_release_extension $SYSTEM)
         if [ ! -f ${RELEASE_FOLDER}/${NEW_ARCHIVE} ]; then
             GOOGLES_ARCHIVE="http://dl.google.com/android/ndk/android-ndk-${SRC_REVISION}-$(system_name_to_ndk_release_name $SYSTEM $HOST_ARCH).$(system_name_to_archive_extension $SYSTEM)"
             download_package $GOOGLES_ARCHIVE DST_FOLDER
@@ -307,7 +495,8 @@ for SYSTEM in $SYSTEMS; do
             popd
 
             pushd $PACK_TEMP
-               7za a -mx=9 ${NEW_ARCHIVE} * > /dev/null
+               OUTPUT=$(compress_folders * android-ndk-${SRC_REVISION}-ma-$(system_name_to_ndk_release_name $SYSTEM $HOST_ARCH))
+#               7za a -mx=9 ${NEW_ARCHIVE} * > /dev/null
                mv ${NEW_ARCHIVE} ../${RELEASE_FOLDER}/
                echo Done, see ../${RELEASE_FOLDER}/${NEW_ARCHIVE}
             popd
