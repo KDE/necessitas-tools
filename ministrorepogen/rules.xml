@@ -28,7 +28,14 @@
             <needs>
                 <item name="QtQtAccessibleQuickPlugin" file="plugins/accessible/libqtaccessiblequick.so"/>
             </needs>
+            <depends>
+                <lib name="QtAndroidGLPlatformPlugin"/>
+            </depends>
+            <replaces>
+                <lib name="QtAndroidPlatformPlugin"/>
+            </replaces>
         </lib>
+        <lib file="plugins/platforms/android/libqtforandroidGL.so" name="QtAndroidGLPlatformPlugin" platform="9" level="9999" />
 
         <lib file="lib/libQt5Widgets.so" >
             <needs>
@@ -69,6 +76,7 @@
                 <lib name="QtAndroidPlatformPlugin"/>
             </depends>
         </lib>
+        <lib file="plugins/platforms/android/libqtforandroid.so" name="QtAndroidPlatformPlugin" platform="9" level="9999" />
 
         <lib file="lib/libQt5Multimedia.so">
             <needs>
@@ -82,7 +90,6 @@
         </lib>
         <lib file="plugins/mediaservice/libandroidmediaplayer.so" name="QtAndroidMediaPlugin" level="9999" />
 
-        <lib file="plugins/platforms/android/libqtforandroid.so" name="QtAndroidPlatformPlugin" platform="9" level="9999" />
 
         <lib file="lib/libQt5OpenGL.so">
             <needs>
@@ -97,7 +104,6 @@
                 <lib name="QtAndroidPlatformPlugin"/>
             </replaces>
         </lib>
-        <lib file="plugins/platforms/android/libqtforandroidGL.so" name="QtAndroidGLPlatformPlugin" platform="9" level="9999" />
 
         <lib file="lib/libQt5Declarative.so" >
             <needs>
