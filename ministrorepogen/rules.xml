@@ -119,10 +119,6 @@
                 <item name="QMLTypes" file="imports/Qt/labs/gestures/plugins.qmltypes"/>
                 <item name="QMLDir" file="imports/Qt/labs/gestures/qmldir"/>
 
-                <item name="QmlParticlesPlugin" file="imports/Qt/labs/particles/libqmlparticlesplugin.so" />
-                <item name="QMLTypes" file="imports/Qt/labs/particles/plugins.qmltypes"/>
-                <item name="QmlDir" file="imports/Qt/labs/particles/qmldir" />
-
                 <item name="QMLTypesBuiltins" file="imports/builtins.qmltypes" />
             </needs>
         </lib>
@@ -199,6 +195,10 @@
                 <item name="SignalSpy.qml" file="qml/QtTest/SignalSpy.qml"/>
                 <item name="TestCase.qml" file="qml/QtTest/TestCase.qml"/>
                 <item name="testlogger.js" file="qml/QtTest/testlogger.js"/>
+
+                <item name="QmlParticlesPlugin" file="imports/Qt/labs/particles/libqmlparticlesplugin.so" />
+                <item name="QMLTypes" file="imports/Qt/labs/particles/plugins.qmltypes"/>
+                <item name="QmlDir" file="imports/Qt/labs/particles/qmldir" />
 
             </needs>
         </lib>

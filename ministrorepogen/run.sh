@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MINISTRO_REPO_VERSION=5.104
+MINISTRO_REPO_VERSION=5.106
 ANDROID_NDK_PATH=/root/necessitas/android-ndk
 READELF=$ANDROID_NDK_PATH/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/bin/arm-linux-androideabi-readelf
 RULES=rules.xml
