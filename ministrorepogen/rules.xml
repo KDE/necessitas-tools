@@ -83,6 +83,15 @@
                 <item name="QtMediaAudioEnginePlugin" file="plugins/mediaservice/libqtmedia_audioengine.so" />
                 <item name="QtMultimediaM3uPlugin" file="plugins/playlistformats/libqtmultimedia_m3u.so" />
                 <item name="QtMultimediaJar" type="jar" file="jar/QtMultimedia.jar" initClass="org.qtproject.qt5.android.multimedia.QtAndroidMediaPlayer"/>
+
+                <item name="QtDeclarativeMultimediaPlugin" file="qml/QtMultimedia/libdeclarative_multimedia.so"/>
+                <item name="QMLTypes" file="qml/QtMultimedia/plugins.qmltypes"/>
+                <item name="QmlDir" file="qml/QtMultimedia/qmldir" />
+                <item name="Video.qml" file="qml/QtMultimedia/Video.qml" />
+
+                <item name=" libQt5MultimediaWidgets.so" file="lib/libQt5MultimediaWidgets.so" />
+                <item name=" libQt5MultimediaQuick_p.so" file="lib/libQt5MultimediaQuick_p.so" />
+
             </needs>
             <depends>
                 <lib name="QtAndroidMediaPlugin"/>
@@ -196,9 +205,127 @@
                 <item name="TestCase.qml" file="qml/QtTest/TestCase.qml"/>
                 <item name="testlogger.js" file="qml/QtTest/testlogger.js"/>
 
-                <item name="QmlParticlesPlugin" file="imports/Qt/labs/particles/libqmlparticlesplugin.so" />
-                <item name="QMLTypes" file="imports/Qt/labs/particles/plugins.qmltypes"/>
-                <item name="QmlDir" file="imports/Qt/labs/particles/qmldir" />
+                <item name="libparticlesplugin.so" file="qml/QtQuick/Particles.2/libparticlesplugin.so"/>
+                <item name="QMLTypes" file="qml/QtQuick/Particles.2/plugins.qmltypes"/>
+                <item name="QmlDir" file="qml/QtQuick/Particles.2/qmldir" />
+
+                <item name="QmlDir" file="qml/QtQuick/LocalStorage/qmldir" />
+                <item name="plugins.qmltypes" file="qml/QtQuick/LocalStorage/plugins.qmltypes" />
+                <item name="libqmllocalstorageplugin.so" file="qml/QtQuick/LocalStorage/libqmllocalstorageplugin.so" />
+
+                <item name="QmlDir" file="qml/QtQuick/XmlListModel/qmldir" />
+                <item name="plugins.qmltypes" file="qml/QtQuick/XmlListModel/plugins.qmltypes" />
+                <item name="libqmllocalstorageplugin.so" file="qml/QtQuick/XmlListModel/libqmlxmllistmodelplugin.so" />
+
+                <item name="QmlDir" file="qml/QtQuick/Window.2/qmldir" />
+                <item name="plugins.qmltypes" file="qml/QtQuick/Window.2/plugins.qmltypes" />
+                <item name="libqmllocalstorageplugin.so" file="qml/QtQuick/Window.2/libwindowplugin.so" />
+
+                <item name="QmlDir" file="qml/QtQuick/Layouts/qmldir" />
+                <item name="plugins.qmltypes" file="qml/QtQuick/Layouts/plugins.qmltypes" />
+                <item name="libqmllocalstorageplugin.so" file="qml/QtQuick/Layouts/libqquicklayoutsplugin.so" />
+
+                <item name="QmlDir" file="qml/QtQuick/Controls/qmldir" />
+                <item name="plugins.qmltypes" file="qml/QtQuick/Controls/plugins.qmltypes" />
+                <item name="libqmllocalstorageplugin.so" file="qml/QtQuick/Controls/libplugin.so" />
+                <item name="ToolButton.qml" file="qml/QtQuick/Controls/ToolButton.qml" />
+                <item name="ToolBar.qml" file="qml/QtQuick/Controls/ToolBar.qml" />
+                <item name="TextField.qml" file="qml/QtQuick/Controls/TextField.qml" />
+                <item name="TextArea.qml" file="qml/QtQuick/Controls/TextArea.qml" />
+                <item name="TableViewColumn.qml" file="qml/QtQuick/Controls/TableViewColumn.qml" />
+                <item name="TableView.qml" file="qml/QtQuick/Controls/TableView.qml" />
+                <item name="TabView.qml" file="qml/QtQuick/Controls/TabView.qml" />
+                <item name="Tab.qml" file="qml/QtQuick/Controls/Tab.qml" />
+                <item name="StatusBar.qml" file="qml/QtQuick/Controls/StatusBar.qml" />
+                <item name="StackViewTransition.qml" file="qml/QtQuick/Controls/StackViewTransition.qml" />
+                <item name="StackViewDelegate.qml" file="qml/QtQuick/Controls/StackViewDelegate.qml" />
+                <item name="StackView.qml" file="qml/QtQuick/Controls/StackView.qml" />
+                <item name="SplitView.qml" file="qml/QtQuick/Controls/SplitView.qml" />
+                <item name="SpinBox.qml" file="qml/QtQuick/Controls/SpinBox.qml" />
+                <item name="Slider.qml" file="qml/QtQuick/Controls/Slider.qml" />
+                <item name="ScrollView.qml" file="qml/QtQuick/Controls/ScrollView.qml" />
+                <item name="RadioButton.qml" file="qml/QtQuick/Controls/RadioButton.qml" />
+                <item name="ProgressBar.qml" file="qml/QtQuick/Controls/ProgressBar.qml" />
+                <item name="MenuBar.qml" file="qml/QtQuick/Controls/MenuBar.qml" />
+                <item name="Menu.qml" file="qml/QtQuick/Controls/Menu.qml" />
+                <item name="Label.qml" file="qml/QtQuick/Controls/Label.qml" />
+                <item name="GroupBox.qml" file="qml/QtQuick/Controls/GroupBox.qml" />
+                <item name="ComboBox.qml" file="qml/QtQuick/Controls/ComboBox.qml" />
+                <item name="CheckBox.qml" file="qml/QtQuick/Controls/CheckBox.qml" />
+                <item name="Button.qml" file="qml/QtQuick/Controls/Button.qml" />
+                <item name="ApplicationWindow.qml" file="qml/QtQuick/Controls/ApplicationWindow.qml" />
+                <item name="style.js" file="qml/QtQuick/Controls/Private/style.js" />
+                <item name="qmldir" file="qml/QtQuick/Controls/Private/qmldir" />
+                <item name="libprivateplugin.so" file="qml/QtQuick/Controls/Private/libprivateplugin.so" />
+                <item name="TabBar.qml" file="qml/QtQuick/Controls/Private/TabBar.qml" />
+                <item name="Style.qml" file="qml/QtQuick/Controls/Private/Style.qml" />
+                <item name="StackViewSlideDelegate.qml" file="qml/QtQuick/Controls/Private/StackViewSlideDelegate.qml" />
+                <item name="StackView.js" file="qml/QtQuick/Controls/Private/StackView.js" />
+                <item name="ScrollViewHelper.qml" file="qml/QtQuick/Controls/Private/ScrollViewHelper.qml" />
+                <item name="ScrollBar.qml" file="qml/QtQuick/Controls/Private/ScrollBar.qml" />
+                <item name="ModalPopupBehavior.qml" file="qml/QtQuick/Controls/Private/ModalPopupBehavior.qml" />
+                <item name="Margins.qml" file="qml/QtQuick/Controls/Private/Margins.qml" />
+                <item name="FocusFrame.qml" file="qml/QtQuick/Controls/Private/FocusFrame.qml" />
+                <item name="Control.qml" file="qml/QtQuick/Controls/Private/Control.qml" />
+                <item name="BasicButton.qml" file="qml/QtQuick/Controls/Private/BasicButton.qml" />
+                <item name="AbstractCheckable.qml" file="qml/QtQuick/Controls/Private/AbstractCheckable.qml" />
+                <item name="qmldir" file="qml/QtQuick/Controls/Styles/qmldir" />
+                <item name="ToolButtonStyle.qml" file="qml/QtQuick/Controls/Styles/ToolButtonStyle.qml" />
+                <item name="ToolBarStyle.qml" file="qml/QtQuick/Controls/Styles/ToolBarStyle.qml" />
+                <item name="TextFieldStyle.qml" file="qml/QtQuick/Controls/Styles/TextFieldStyle.qml" />
+                <item name="TableViewStyle.qml" file="qml/QtQuick/Controls/Styles/TableViewStyle.qml" />
+                <item name="TabViewStyle.qml" file="qml/QtQuick/Controls/Styles/TabViewStyle.qml" />
+                <item name="StatusBarStyle.qml" file="qml/QtQuick/Controls/Styles/StatusBarStyle.qml" />
+                <item name="SpinBoxStyle.qml" file="qml/QtQuick/Controls/Styles/SpinBoxStyle.qml" />
+                <item name="SliderStyle.qml" file="qml/QtQuick/Controls/Styles/SliderStyle.qml" />
+                <item name="ScrollViewStyle.qml" file="qml/QtQuick/Controls/Styles/ScrollViewStyle.qml" />
+                <item name="RadioButtonStyle.qml" file="qml/QtQuick/Controls/Styles/RadioButtonStyle.qml" />
+                <item name="ProgressBarStyle.qml" file="qml/QtQuick/Controls/Styles/ProgressBarStyle.qml" />
+                <item name="MenuStyle.qml" file="qml/QtQuick/Controls/Styles/MenuStyle.qml" />
+                <item name="MenuBarStyle.qml" file="qml/QtQuick/Controls/Styles/MenuBarStyle.qml" />
+                <item name="GroupBoxStyle.qml" file="qml/QtQuick/Controls/Styles/GroupBoxStyle.qml" />
+                <item name="FocusFrameStyle.qml" file="qml/QtQuick/Controls/Styles/FocusFrameStyle.qml" />
+                <item name="ComboBoxStyle.qml" file="qml/QtQuick/Controls/Styles/ComboBoxStyle.qml" />
+                <item name="CheckBoxStyle.qml" file="qml/QtQuick/Controls/Styles/CheckBoxStyle.qml" />
+                <item name="ButtonStyle.qml" file="qml/QtQuick/Controls/Styles/ButtonStyle.qml" />
+                <item name="tab_selected.png" file="qml/QtQuick/Controls/Styles/images/tab_selected.png" />
+                <item name="tab.png" file="qml/QtQuick/Controls/Styles/images/tab.png" />
+                <item name="scrollbar-handle-vertical.png" file="qml/QtQuick/Controls/Styles/images/scrollbar-handle-vertical.png" />
+                <item name="scrollbar-handle-horizontal.png" file="qml/QtQuick/Controls/Styles/images/scrollbar-handle-horizontal.png" />
+                <item name="progress-indeterminate.png" file="qml/QtQuick/Controls/Styles/images/progress-indeterminate.png" />
+                <item name="header.png" file="qml/QtQuick/Controls/Styles/images/header.png" />
+                <item name="groupbox.png" file="qml/QtQuick/Controls/Styles/images/groupbox.png" />
+                <item name="focusframe.png" file="qml/QtQuick/Controls/Styles/images/focusframe.png" />
+                <item name="editbox.png" file="qml/QtQuick/Controls/Styles/images/editbox.png" />
+                <item name="button_down.png" file="qml/QtQuick/Controls/Styles/images/button_down.png" />
+                <item name="button.png" file="qml/QtQuick/Controls/Styles/images/button.png" />
+                <item name="arrow-up@2x.png" file="qml/QtQuick/Controls/Styles/images/arrow-up@2x.png" />
+                <item name="arrow-up.png" file="qml/QtQuick/Controls/Styles/images/arrow-up.png" />
+                <item name="arrow-right@2x.png" file="qml/QtQuick/Controls/Styles/images/arrow-right@2x.png" />
+                <item name="arrow-right.png" file="qml/QtQuick/Controls/Styles/images/arrow-right.png" />
+                <item name="arrow-left@2x.png" file="qml/QtQuick/Controls/Styles/images/arrow-left@2x.png" />
+                <item name="arrow-left.png" file="qml/QtQuick/Controls/Styles/images/arrow-left.png" />
+                <item name="arrow-down@2x.png" file="qml/QtQuick/Controls/Styles/images/arrow-down@2x.png" />
+                <item name="arrow-down.png" file="qml/QtQuick/Controls/Styles/images/arrow-down.png" />
+                <item name="qmldir" file="qml/QtQuick/Controls/Styles/Private/qmldir" />
+                <item name="ToolButtonStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/ToolButtonStyle.qml" />
+                <item name="ToolBarStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/ToolBarStyle.qml" />
+                <item name="TextFieldStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/TextFieldStyle.qml" />
+                <item name="TableViewStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/TableViewStyle.qml" />
+                <item name="TabViewStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/TabViewStyle.qml" />
+                <item name="StatusBarStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/StatusBarStyle.qml" />
+                <item name="SpinBoxStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/SpinBoxStyle.qml" />
+                <item name="SliderStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/SliderStyle.qml" />
+                <item name="ScrollViewStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/ScrollViewStyle.qml" />
+                <item name="RadioButtonStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/RadioButtonStyle.qml" />
+                <item name="ProgressBarStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/ProgressBarStyle.qml" />
+                <item name="MenuStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/MenuStyle.qml" />
+                <item name="MenuBarStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/MenuBarStyle.qml" />
+                <item name="GroupBoxStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/GroupBoxStyle.qml" />
+                <item name="FocusFrameStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/FocusFrameStyle.qml" />
+                <item name="ComboBoxStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/ComboBoxStyle.qml" />
+                <item name="CheckBoxStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/CheckBoxStyle.qml" />
+                <item name="ButtonStyle.qml" file="qml/QtQuick/Controls/Styles/Desktop/ButtonStyle.qml" />
 
             </needs>
         </lib>
