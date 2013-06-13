@@ -1,10 +1,10 @@
 #!/bin/bash
 
-MINISTRO_REPO_VERSION=5.106
+MINISTRO_REPO_VERSION=5.107
 ANDROID_NDK_PATH=/root/necessitas/android-ndk
 READELF=$ANDROID_NDK_PATH/toolchains/arm-linux-androideabi-4.7/prebuilt/linux-x86_64/bin/arm-linux-androideabi-readelf
 RULES=rules.xml
-QT_BINS=/opt/Qt5.1.0/5.1.0-beta1
+QT_BINS=/opt/Qt5.1.0/5.1.0-rc1
 
 create_repo()
 {

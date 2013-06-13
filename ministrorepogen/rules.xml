@@ -116,9 +116,9 @@
 
         <lib file="lib/libQt5Declarative.so" >
             <needs>
-                <item name="QMLDbgInspectorPlugin" file="plugins/qmltooling/libqmldbg_inspector.so"/>
+                <item name="QMLDbgInspectorPlugin" file="plugins/qml1tooling/libqmldbg_inspector.so"/>
 
-                <item name="QMLDbgTcpQtDeclarativePlugin" file="plugins/qmltooling/libqmldbg_tcp_qtdeclarative.so"/>
+                <item name="QMLDbgTcpQtDeclarativePlugin" file="plugins/qml1tooling/libqmldbg_tcp_qtdeclarative.so"/>
 
                 <item name="QMLFolderListModelPlugin" file="imports/Qt/labs/folderlistmodel/libqmlfolderlistmodelplugin.so"/>
                 <item name="QMLTypes" file="imports/Qt/labs/folderlistmodel/plugins.qmltypes"/>
