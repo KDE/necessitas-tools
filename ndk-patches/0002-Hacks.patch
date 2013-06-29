@@ -1,23 +1,7 @@
-diff --git a/build/core/init.mk b/build/core/init.mk
-index 9b4e28a..d435f25 100644
---- a/build/core/init.mk
-+++ b/build/core/init.mk
-@@ -218,9 +218,9 @@ ifndef HOST_ARCH
-         HOST_ARCH := $(PROCESSOR_ARCHITECTURE)
-         ifeq ($(HOST_ARCH),AMD64)
-             HOST_ARCH := x86
--        endif
--        ifneq ("",$(shell echo "%ProgramW6432%"))
-             HOST_ARCH64 := x86_64
-+        else
-+            HOST_ARCH := x86
-         endif
-     else # HOST_OS_BASE != windows
-         UNAME := $(shell uname -m)
-diff --git a/build/core/ndk-common.sh b/build/core/ndk-common.sh
+diff --git a/build/core/ndk-common.sh b/build/tools/ndk-common.sh
 index e8c2389..8adc5ed 100644
---- a/build/core/ndk-common.sh
-+++ b/build/core/ndk-common.sh
+--- a/build/tools/ndk-common.sh
++++ b/build/tools/ndk-common.sh
 @@ -90,9 +90,9 @@ fi
  #
  setup_default_log_file ()

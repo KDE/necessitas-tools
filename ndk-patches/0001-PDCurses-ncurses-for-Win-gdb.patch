@@ -182,22 +182,6 @@ index 2c3f91c..0abcbb7 100755
      TEXT="$(bh_host_text) gdb-$BH_TARGET_ARCH-$3:"
  
      mkdir -p "$BUILDDIR" && rm -rf "$BUILDDIR"/* &&
-@@ -235,8 +394,14 @@ install_host_gdb ()
-     dump "$(bh_host_text) gdb-$BH_TARGET_ARCH-$3: Installing"
-     run copy_directory "$SRCDIR/bin" "$DSTDIR/bin"
-     if [ -d "$SRCDIR/share/gdb" ]; then
--        run copy_directory "$SRCDIR/share/gdb" "$DSTDIR/share/gdb"
-+        run copy_directory "$SRCDIR/share/gdb"      "$DSTDIR/share/gdb"
-     fi
-+#    if [ -d "$SRCDIR/share/terminfo" ]; then
-+#        run copy_directory "$SRCDIR/share/terminfo" "$DSTDIR/share/terminfo"
-+#    fi
-+#    if [ -d "$SRCDIR/share/tabset" ]; then
-+#        run copy_directory "$SRCDIR/share/tabset"   "$DSTDIR/share/tabset"
-+#    fi
- }
- 
- need_install_host_gdb ()
 diff --git a/build/tools/toolchain-patches/gdb/0001-disable-windows-termcap-if-enable-tui.patch b/build/tools/toolchain-patches/gdb/0001-disable-windows-termcap-if-enable-tui.patch
 new file mode 100644
 index 0000000..8f099f5

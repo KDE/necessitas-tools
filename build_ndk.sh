@@ -9,13 +9,15 @@ PROGNAME=$(basename $0)
 PROGDIR=$(dirname $0)
 PROGDIR=$(cd $PROGDIR && pwd)
 
+#set -e
+
 # This will be reset later.
 LOG_FILE=/dev/null
 
 HELP=
 VERBOSE=1
 
-NDK_VER=r8d
+NDK_VER=r8e
 DATESUFFIX=$(date +%y%m%d)
 # This must be the same as TEMP_PATH in build_sdk.sh
 if [ "$OSTYPE_MAJOR" = "msys" ] ; then
@@ -226,6 +228,18 @@ bh_list_remove ()
   return $RETCODE
 }
 
+rebase_absolute_paths ()
+{
+    local _PATH=$1
+    local _FIND=$2
+    local _REPL=$3
+
+    FILES="$(find $_PATH \( -name '*.la' -or -path '*/ldscripts/*' -or -name '*.conf' -or -name 'mkheaders' -or -name '*.py' -or -name '*.h' \))"
+    for FILE in $FILES; do
+        sed -i "s#${_FIND}#${_REPL}#g" $FILE
+    done
+}
+
 ###################
 # Build OS checks #
 ###################
@@ -364,17 +378,6 @@ if [ ! -d $NDK ] ; then
   # git clone http://anongit.kde.org/android-qt-ndk.git $NDK
   git clone https://android.googlesource.com/platform/ndk $NDK
   (pushd $NDK;
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/10/51010/2 && git cherry-pick FETCH_HEAD # gnu-libstdc++: --visible-libgnustl-static option
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/01/51001/1 && git cherry-pick FETCH_HEAD # Remove redundant, stale shell fn from build-host-gcc.sh
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/02/51002/1 && git cherry-pick FETCH_HEAD # build-host-gcc.sh: --build-dir option
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/20/51020/1 && git cherry-pick FETCH_HEAD # build-host-gcc.sh: Simplify and fix gold enable/disable-ment
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/03/51003/1 && git cherry-pick FETCH_HEAD # build-host-gcc.sh: --disable-plugins --disable-plugin globally
-#   If https://android-review.googlesource.com/#/c/51005/ is not merged then we need to use:
-#   git fetch https://android.googlesource.com/platform/ndk refs/changes/03/51003/2 && git cherry-pick FETCH_HEAD
-#   ...as soon as it is merged, we can go back to Patch version 1.
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/11/51011/1 && git cherry-pick FETCH_HEAD # build-host-gcc.sh: enable libgomp where possible (ARM > 4.4.3)
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/12/51012/1 && git cherry-pick FETCH_HEAD # Windows: Update build-mingw64-toolchain.sh for modern versions.
-    git fetch https://android.googlesource.com/platform/ndk refs/changes/04/51004/1 && git cherry-pick FETCH_HEAD # build-host-gdb.sh: Fix expat prefix
     patch -p1 < $PROGDIR/ndk-patches/0001-PDCurses-ncurses-for-Win-gdb.patch
     patch -p1 < $PROGDIR/ndk-patches/0002-Hacks.patch
     )
@@ -389,6 +392,13 @@ fi
 # Get (or build) the required per-host cross compilers #
 ########################################################
 
+HOST_COMPILERS_ROOT=$HOST_TOOLS
+PREBUILTS=${HOST_COMPILERS_ROOT}/prebuilts
+HOST_COMPILERS_ROOT_HOST=${PREBUILTS}/gcc/linux-x86/host/
+LINUX32_CC_URL=https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/host/i686-linux-glibc2.7-4.6
+LINUX64_CC_URL=https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.7-4.6
+LINUX_GCC_SDK_URL=https://android.googlesource.com/platform/prebuilts/tools
+
 # We don't need Google's special glibc2.7 linux GCCs if we're in BogDan's
 # Debian env.
 # Otherwise, we use it, assuming that Linux is the only OS worth doing
@@ -399,29 +409,85 @@ if [ "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
     DEBIAN_VERSION=$(head -n 1 /etc/debian_version)
   fi
 
-  # BINPREFIX is needed for building highly compatiable mingw-w64 toolchains.
-  BINPREFIX=
   if [ ! "$DEBIAN_VERSION" = "6.0.5" -a "$OSTYPE_MAJOR" = "linux-gnu" ] ; then
-    if [ ! -d $HOST_TOOLS/linux ] ; then
-      (mkdir -p $HOST_TOOLS/linux; cd /tmp; \
-       download http://mingw-and-ndk.googlecode.com/files/i686-linux-glibc2.7-4.4.3.tar.bz2; \
-       tar -xjf i686-linux-glibc2.7-4.4.3.tar.bz2 -C $HOST_TOOLS/linux/)
-    fi
-    export PATH=$HOST_TOOLS/linux/i686-linux-glibc2.7-4.4.3/bin:$PATH
-    BINPREFIX=--binprefix=i686-linux
+      if [ ! -d $HOST_COMPILERS_ROOT_HOST/$(basename $LINUX32_CC_URL) ]; then
+          (
+           mkdir -p $HOST_COMPILERS_ROOT_HOST
+           cd $HOST_COMPILERS_ROOT_HOST
+           git clone $LINUX32_CC_URL $(basename $LINUX32_CC_URL)
+           find . \( -name "*.la" -or -path "*ldscripts*" \)
+          )
+          rebase_absolute_paths "$HOST_COMPILERS_ROOT_HOST/$(basename $LINUX32_CC_URL)" "/tmp/ahsieh-gcc-32-x19222/2/i686-linux-glibc2.7-4.6" "$PWD/prebuilts/gcc/linux-x86/host/prebuilts-gcc-linux-x86-host-i686-linux-glibc2.7-4.6"
+          # This is just to catch one file ;-)
+          rebase_absolute_paths "$HOST_COMPILERS_ROOT_HOST/$(basename $LINUX32_CC_URL)" "/tmp/ahsieh-gcc-32-x19222/1/i686-linux-glibc2.7-4.6" "$PWD/prebuilts/gcc/linux-x86/host/prebuilts-gcc-linux-x86-host-i686-linux-glibc2.7-4.6"
+      fi
+      if [ ! -d $HOST_COMPILERS_ROOT_HOST/$(basename $LINUX64_CC_URL) ]; then
+          (
+           mkdir -p $HOST_COMPILERS_ROOT_HOST
+           cd $HOST_COMPILERS_ROOT_HOST
+           git clone $LINUX64_CC_URL $(basename $LINUX64_CC_URL)
+          )
+          rebase_absolute_paths "$HOST_COMPILERS_ROOT_HOST/$(basename $LINUX64_CC_URL)" "/tmp/ahsieh-gcc-64-X27190/2"                         "$PWD/prebuilts/gcc/linux-x86/host"
+      fi
+      if [ ! -d $PREBUILTS/tools ]; then
+          pushd $PREBUILTS
+          git clone https://android.googlesource.com/platform/prebuilts/tools
+          popd
+      fi
+      export PATH=$PREBUILTS/tools/gcc-sdk:$PATH
+      BINPREFIX=--binprefix=i686-linux
   fi
 fi
 
 # Check MinGW (and possibly build the cross compiler)
-if [ ! "$(bh_list_contains "windows-x86"    $LIST_SYSTEMS)" = "no" -o \
-     ! "$(bh_list_contains "windows-x86_64" $LIST_SYSTEMS)" = "no" ] ; then
-  if [ ! -d "$HOST_TOOLS/mingw" ] ; then
-    $NDK/build/tools/build-mingw64-toolchain.sh --target-arch=i686 --package-dir=i686-w64-mingw32-toolchain $BINPREFIX
-    fail_panic "Couldn't build mingw-w64 toolchain"
-    mkdir -p $HOST_TOOLS/mingw
-    tar -xjf i686-w64-mingw32-toolchain/*.tar.bz2 -C $HOST_TOOLS/mingw
-  fi
-  export PATH=$HOST_TOOLS/mingw/i686-w64-mingw32/bin:$PATH
+#if [ ! "$(bh_list_contains "windows-x86"    $LIST_SYSTEMS)" = "no" -o \
+#     ! "$(bh_list_contains "windows-x86_64" $LIST_SYSTEMS)" = "no" ] ; then
+#  if [ ! -d "$HOST_TOOLS/mingw" ] ; then
+#    $NDK/build/tools/build-mingw64-toolchain.sh --target-arch=i686 --package-dir=i686-w64-mingw32-toolchain $BINPREFIX
+#    fail_panic "Couldn't build mingw-w64 toolchain"
+#    mkdir -p $HOST_TOOLS/mingw
+#    tar -xjf i686-w64-mingw32-toolchain/*.tar.bz2 -C $HOST_TOOLS/mingw
+#  fi
+#  export PATH=$HOST_TOOLS/mingw/i686-w64-mingw32/bin:$PATH
+#fi
+
+MINGW_W64_ROOT32=${HOST_COMPILERS_ROOT}/i686-w64-mingw32
+MINGW_W64_URL32=https://mingw-and-ndk.googlecode.com/files/i686-w64-mingw32-linux-i686-glibc2.7.tar.bz2
+
+MINGW_W64_ROOT64=${HOST_COMPILERS_ROOT}/x86_64-w64-mingw32
+MINGW_W64_URL64=https://mingw-and-ndk.googlecode.com/files/x86_64-w64-mingw32-linux-i686-glibc2.7.tar.xz
+
+set -x
+if [ "$(bh_list_contains windows-x86 $LIST_SYSTEMS)" != "no" -o "$SYSTEMS" = "all" ]; then
+    if [ ! -d $MINGW_W64_ROOT32 ]; then
+        (
+         mkdir -p $HOST_COMPILERS_ROOT
+         cd $HOST_COMPILERS_ROOT
+         curl -S -L -O $MINGW_W64_URL32
+         tar -xjf $(basename $MINGW_W64_URL32)
+         pushd $(basename $MINGW_W64_ROOT32)
+         patch -p1 < $PROGDIR/mingw-w64-stdio-h-extern-C-asprintf.patch
+         popd
+        )
+    fi
+    export PATH=$HOST_COMPILERS_ROOT/i686-w64-mingw32/bin:$PATH
+    if [ ! -d $MINGW_W64_ROOT64 ]; then
+        (
+         mkdir -p $HOST_COMPILERS_ROOT
+         cd $HOST_COMPILERS_ROOT
+         curl -S -L -O $MINGW_W64_URL64
+         tar -xJf $(basename $MINGW_W64_URL64)
+         pushd $(basename $MINGW_W64_ROOT64)
+         popd
+        )
+    fi
+    export PATH=$HOST_COMPILERS_ROOT/x86_64-w64-mingw32/bin:$PATH
+fi
+
+echo $PATH
+if [ ! `which x86_64-w64-mingw32-gcc` ]; then
+echo "no x86_64-w64-mingw32-gcc"
+exit 1
 fi
 
 # By this point, having anything is DARWINSDK can be taken to mean that
@@ -540,8 +606,7 @@ PACKAGE_DIR=$PWD/release-$DATESUFFIX
 mkdir -p $PACKAGE_DIR
 
 # Build Python first as it's (currently) the most likely thing to fail.
-SYSTEMSLIST=$(commas_to_spaces $SYSTEMS)
-if [ "$(bh_list_contains $BUILD_OS-$BUILD_ARCH $SYSTEMSLIST)" = "no" ] ; then
+if [ "$(bh_list_contains $BUILD_OS-$BUILD_ARCH $LIST_SYSTEMS)" = "no" ] ; then
   log "Adding $BUILD_OS-$BUILD_ARCH for Python build"
   SYSTEMSPY=$SYSTEMS",$BUILD_OS-$BUILD_ARCH"
 else
@@ -552,7 +617,7 @@ $NDK/build/tools/build-host-python.sh --toolchain-src-dir=$TC_SRC_DIR \
   --build-dir=$PYTHON_BUILD_DIR \
   --systems="$SYSTEMSPY" \
   --package-dir=$PACKAGE_DIR \
-  --python-version=2.7.3 \
+  --python-version=2.7.5 \
    -j$JOBS
 
 fail_panic "build-host-python.sh failed"
@@ -560,6 +625,7 @@ fail_panic "build-host-python.sh failed"
 #  --no-strip \
 #  --force-gold-build \
 #  --default-ld=gold \
+if [ "0" = "1" ]; then
 $NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
   --build-dir=$GCC_BUILD_DIR \
   --gmp-version=5.0.5 \
@@ -567,6 +633,7 @@ $NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
   --package-dir=$PACKAGE_DIR \
     $ARCHES_BY_VERSIONS \
    -j$JOBS
+fi
 
 $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
   --build-dir=$GDB_BUILD_DIR \
