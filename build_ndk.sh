@@ -5,6 +5,9 @@
 # is that dev-rebuild-ndk.sh would be used once it uses the build_host
 # scripts.
 
+# To clean out build artefacts and packages:
+# rm -rf /tmp/ndk-$USER /tmp/necessitas/ndk-build release-*
+
 PROGNAME=$(basename $0)
 PROGDIR=$(dirname $0)
 PROGDIR=$(cd $PROGDIR && pwd)
@@ -30,7 +33,12 @@ HOST_TOOLS=$BUILD_DIR/host_compiler_tools
 GCC_VER_LINARO=4.6-2012.07
 GCC_VER_LINARO_MAJOR=4.6
 GCC_VER_LINARO_LOCAL=4.6.3
-ARCHES="arm,mips,x86"
+
+#GDB_VERSIONS=7.3.x,7.6
+GDB_VERSIONS=7.6
+
+#ARCHES="arm,mips,x86"
+ARCHES="arm"
 OSTYPE_MAJOR=${OSTYPE//[0-9.]/}
 export PATH=$PATH:$HOST_TOOLS/darwin/apple-osx/bin
 PATH=$PATH:$HOST_TOOLS/darwin/apple-osx/bin
@@ -76,8 +84,8 @@ fi
 case $OSTYPE_MAJOR in
     linux*)
         # Linux is the only build machine on which all host toolchains can be built.
-        SYSTEMS=linux-x86,linux-x86_64,windows-x86,windows-x86_64,darwin-x86,darwin-x86_64
-#        SYSTEMS=linux-x86,linux-x86_64,windows-x86,windows-x86_64
+#        SYSTEMS=linux-x86,linux-x86_64,windows-x86,windows-x86_64,darwin-x86,darwin-x86_64
+        SYSTEMS=linux-x86,linux-x86_64,windows-x86,windows-x86_64
         NUM_CORES=$(grep -c -e '^processor' /proc/cpuinfo)
         BUILD_OS="linux"
         ;;
@@ -457,7 +465,6 @@ MINGW_W64_URL32=https://mingw-and-ndk.googlecode.com/files/i686-w64-mingw32-linu
 MINGW_W64_ROOT64=${HOST_COMPILERS_ROOT}/x86_64-w64-mingw32
 MINGW_W64_URL64=https://mingw-and-ndk.googlecode.com/files/x86_64-w64-mingw32-linux-i686-glibc2.7.tar.xz
 
-set -x
 if [ "$(bh_list_contains windows-x86 $LIST_SYSTEMS)" != "no" -o "$SYSTEMS" = "all" ]; then
     if [ ! -d $MINGW_W64_ROOT32 ]; then
         (
@@ -605,13 +612,19 @@ PACKAGE_DIR=$PWD/release-$DATESUFFIX
 
 mkdir -p $PACKAGE_DIR
 
+SYSTEMSPY=$SYSTEMS
+
+# if [ ! "$(bh_list_contains windows-x86 $LIST_SYSTEMS)" = "no" ] ; then
+#  log "Swapping windows-x86 for windows in SYSTEMSPY"
+#  SYSTEMSPY=$(bh_list_remove windows-x86 $LIST_SYSTEMS)
+#  SYSTEMSPY=$SYSTEMSPY" windows"
+# fi
+
 # Build Python first as it's (currently) the most likely thing to fail.
-if [ "$(bh_list_contains $BUILD_OS-$BUILD_ARCH $LIST_SYSTEMS)" = "no" ] ; then
-  log "Adding $BUILD_OS-$BUILD_ARCH for Python build"
-  SYSTEMSPY=$SYSTEMS",$BUILD_OS-$BUILD_ARCH"
-else
-  SYSTEMSPY=$SYSTEMS
-fi
+# if [ "$(bh_list_contains $BUILD_OS-$BUILD_ARCH $LIST_SYSTEMS)" = "no" ] ; then
+#   log "Adding $BUILD_OS-$BUILD_ARCH for Python build"
+#   SYSTEMSPY=$SYSTEMSPY",$BUILD_OS-$BUILD_ARCH"
+# fi
 
 $NDK/build/tools/build-host-python.sh --toolchain-src-dir=$TC_SRC_DIR \
   --build-dir=$PYTHON_BUILD_DIR \
@@ -635,15 +648,24 @@ $NDK/build/tools/build-host-gcc.sh --toolchain-src-dir=$TC_SRC_DIR \
    -j$JOBS
 fi
 
-$NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
-  --build-dir=$GDB_BUILD_DIR \
-  --systems="$SYSTEMS" \
-  --package-dir=$PACKAGE_DIR \
-  --gdb-version=7.3.x \
-  --arch=$ARCHES \
-  --python-build-dir=$PYTHON_BUILD_DIR \
-  --python-version=2.7.3 \
-   -j$JOBS
+GDB_VERSION_LIST=$(commas_to_spaces $GDB_VERSIONS)
+
+for GDB_VERSION in $GDB_VERSION_LIST; do
+    $NDK/build/tools/build-host-gdb.sh --toolchain-src-dir=$TC_SRC_DIR \
+      --build-dir=$GDB_BUILD_DIR \
+      --systems="$SYSTEMSPY" \
+      --package-dir=$PACKAGE_DIR \
+      --no-strip \
+      --gdb-version=$GDB_VERSION \
+      --arch=$ARCHES \
+      --python-build-dir=$PYTHON_BUILD_DIR \
+      --python-version=2.7.5 \
+       -j$JOBS
+done
+
+fail_panic "build-host-gdb.sh failed"
+
+exit 0
 
 rm -rf /tmp/ndk-$USER/build/gdbserver*
 
