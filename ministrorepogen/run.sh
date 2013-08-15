@@ -1,7 +1,7 @@
 #!/bin/bash
 
 QT_BINS=/opt/Qt/5.1.0
-MINISTRO_REPO_VERSION=5.109
+MINISTRO_REPO_VERSION=5.1011
 QT_VERSION=$((0x050100))
 ANDROID_NDK_PATH=/root/necessitas/android-ndk
 RULES=rules.xml

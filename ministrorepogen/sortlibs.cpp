@@ -51,7 +51,7 @@ static QStringList getLibs(const QString &  readelfPath, const QString & lib)
 
 static int setLevel(const QString & library, librariesMap & mapLibs)
 {
-    int maxlevel=mapLibs[library].level;
+    int maxlevel = mapLibs[library].level;
     if (maxlevel>0)
         return maxlevel;
     foreach (QString lib, mapLibs[library].dependencies)
@@ -74,8 +74,8 @@ static int setLevel(const QString & library, librariesMap & mapLibs)
         }
     }
     if (mapLibs[library].level<0)
-        mapLibs[library].level=maxlevel+1;
-    return maxlevel+1;
+        mapLibs[library].level = maxlevel+1;
+    return maxlevel + 1;
 }
 
 void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QString & path, const QStringList & excludePath)
@@ -121,7 +121,7 @@ void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QS
             else
                 ++it;
         }
-        if (!mapLibs[key].dependencies.size())
+        if (!mapLibs[key].dependencies.size() && mapLibs[key].level == -1)
             mapLibs[key].level = 0;
     }
 

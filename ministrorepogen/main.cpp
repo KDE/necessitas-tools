@@ -59,6 +59,13 @@ static void addNeedsFile(QVector<NeedsStruct> & needs, const QString & file)
     needs << needed;
 }
 
+static QString niceName(const QString & name)
+{
+    if (name.startsWith("lib") && name.endsWith(".so"))
+        return name.mid(3, name.length() -6);
+    return name;
+}
+
 static void parseXmlFile(librariesMap &libs, const QString &xmlFile, const QString &libsPath)
 {
     QDomDocument doc("libs");
@@ -87,7 +94,7 @@ static void parseXmlFile(librariesMap &libs, const QString &xmlFile, const QStri
         QString file = childs.attribute("file");
         if (file != "libs/libgnustl_shared.so")
         {
-            QString libName = file.mid(file.lastIndexOf('/') + 1);
+            QString libName = niceName(file.mid(file.lastIndexOf('/') + 1));
             if (!file.startsWith("lib/"))
             {
                 libs[libName].relativePath = file;
@@ -101,7 +108,7 @@ static void parseXmlFile(librariesMap &libs, const QString &xmlFile, const QStri
             if (childs.hasAttribute("replaces"))
             {
                 QString replaces = childs.attribute("replaces");
-                replaces = replaces.mid(replaces.lastIndexOf('/') + 1);
+                replaces = niceName(replaces.mid(replaces.lastIndexOf('/') + 1));
                 if (!libs[libName].replaces.contains(replaces))
                         libs[libName].replaces << replaces;
             }
