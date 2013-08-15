@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2011, BogDan Vatra <bog_dan_ro@yahoo.com>
+    Copyright (c) 2011-2013, BogDan Vatra <bog_dan_ro@yahoo.com>
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License as
@@ -30,15 +30,16 @@
 #include <io.h>
 #endif
 
+#include <QDirIterator>
 #include <unistd.h>
 
-void printHelp()
+static void printHelp()
 {
     qDebug()<<"Usage:./ministrorepogen <readelf executable path> <libraries path> <version> <abi version> <xml rules file> <output folder>  <out objects repo version> <qt version>";
 }
 
 
-void getFileInfo(const QString & filePath, qint64 & fileSize, QString & sha1)
+static void getFileInfo(const QString & filePath, qint64 & fileSize, QString & sha1)
 {
     fileSize = -1;
     QFile file(filePath);
@@ -48,6 +49,100 @@ void getFileInfo(const QString & filePath, qint64 & fileSize, QString & sha1)
     hash.addData(file.readAll());
     sha1=hash.result().toHex();
     fileSize=file.size();
+}
+
+static void addNeedsFile(QVector<NeedsStruct> & needs, const QString & file)
+{
+    NeedsStruct needed;
+    needed.relativePath=file;
+    needed.name=file.mid(file.lastIndexOf('/') + 1);
+    needs << needed;
+}
+
+static void parseXmlFile(librariesMap &libs, const QString &xmlFile, const QString &libsPath)
+{
+    QDomDocument doc("libs");
+    QFile xf(xmlFile);
+    if (!xf.open(QIODevice::ReadOnly))
+        return;
+    if (!doc.setContent(&xf))
+        return;
+    QDomElement element = doc.documentElement().firstChildElement("dependencies").firstChildElement("lib");
+    if (element.isNull())
+        return;
+
+    if (!element.hasAttribute("name"))
+        return;
+
+    const QString name=element.attribute("name");
+    const QString libraryName=QString("lib%1.so").arg(name);
+    libs[libraryName].relativePath=QString("lib/%1").arg(libraryName);
+    libs[libraryName].name=name;
+    if (element.hasAttribute("platform"))
+        libs[libraryName].platform=element.attribute("platform").toInt();
+    element = element.firstChildElement("depends");
+    QDomElement childs=element.firstChildElement("lib");
+    while(!childs.isNull())
+    {
+        QString file = childs.attribute("file");
+        if (file != "libs/libgnustl_shared.so")
+        {
+            QString libName = file.mid(file.lastIndexOf('/') + 1);
+            if (!file.startsWith("lib/"))
+            {
+                libs[libName].relativePath = file;
+                libs[libName].name = libName;
+                libs[libName].level = 9999;
+            }
+
+            if (!libs[libraryName].dependencies.contains(libName))
+                libs[libraryName].dependencies << libName;
+
+            if (childs.hasAttribute("replaces"))
+            {
+                QString replaces = childs.attribute("replaces");
+                replaces = replaces.mid(replaces.lastIndexOf('/') + 1);
+                if (!libs[libName].replaces.contains(replaces))
+                        libs[libName].replaces << replaces;
+            }
+        }
+        childs=childs.nextSiblingElement("lib");
+    }
+
+    childs=element.firstChildElement("jar");
+    while(!childs.isNull())
+    {
+        if (!childs.hasAttribute("bundling"))
+        {
+            NeedsStruct needed;
+            needed.relativePath=childs.attribute("file");
+            needed.name=needed.relativePath.mid(needed.relativePath.lastIndexOf('/') + 1);
+            needed.type="jar";
+            if (childs.hasAttribute("initClass"))
+                needed.initClass=childs.attribute("initClass");
+            libs[libraryName].needs << needed;
+        }
+        childs=childs.nextSiblingElement("jar");
+    }
+
+    childs=element.firstChildElement("bundled");
+    while(!childs.isNull())
+    {
+        QString file = childs.attribute("file");
+        if (QFileInfo(libsPath + file).isDir())
+        {
+            QDirIterator it(libsPath + file, QDirIterator::Subdirectories);
+            while(it.hasNext())
+            {
+                it.next();
+                if (it.fileInfo().isFile())
+                    addNeedsFile(libs[libraryName].needs, it.fileInfo().filePath().mid(libsPath.length()));
+            }
+        }
+        else
+            addNeedsFile(libs[libraryName].needs, file);
+        childs=childs.nextSiblingElement("bundled");
+    }
 }
 
 int main(int argc, char *argv[])
@@ -61,6 +156,8 @@ int main(int argc, char *argv[])
 
     const char * readelfPath=argv[1];
     QString libsPath(argv[2]);
+    if (!libsPath.endsWith('/'))
+        libsPath += '/';
     const char * version=argv[3];
     const char * abiVersion=argv[4];
     const char * rulesFile=argv[5];
@@ -111,64 +208,13 @@ int main(int argc, char *argv[])
     QString loaderClassName=element.attribute("loaderClassName");
     QString applicationParameters=element.attribute("applicationParameters");
     QString environmentVariables=element.attribute("environmentVariables");
-
-    element=element.firstChildElement("lib");
     librariesMap libs;
-    while(!element.isNull())
-    {
-        if (!element.hasAttribute("file"))
-        {
-            element=element.nextSiblingElement();
-            continue;
-        }
 
-        const QString filePath=element.attribute("file");
-        const QString libraryName=filePath.mid(filePath.lastIndexOf('/')+1);
-        libs[libraryName].relativePath=filePath;
+    // check all android xml rules
+    QDirIterator it(libsPath + "lib/", QStringList("*.xml"));
+    while(it.hasNext())
+        parseXmlFile(libs, it.next(), libsPath);
 
-        if (element.hasAttribute("name"))
-            libs[libraryName].name=element.attribute("name");
-
-        if (element.hasAttribute("platform"))
-            libs[libraryName].platform=element.attribute("platform").toInt();
-
-        if (element.hasAttribute("level"))
-        {
-            bool ok=false;
-            libs[libraryName].level=element.attribute("level").toInt(&ok);
-            if (!ok)
-                libs[libraryName].level=-1;
-        }
-
-        QDomElement childs=element.firstChildElement("depends").firstChildElement("lib");
-        while(!childs.isNull())
-        {
-            libs[libraryName].dependencies<<childs.attribute("name");
-            childs=childs.nextSiblingElement("lib");
-        }
-
-        childs=element.firstChildElement("replaces").firstChildElement("lib");
-        while(!childs.isNull())
-        {
-            libs[libraryName].replaces<<childs.attribute("name");
-            childs=childs.nextSiblingElement("lib");
-        }
-
-        childs=element.firstChildElement("needs").firstChildElement("item");
-        while(!childs.isNull())
-        {
-            NeedsStruct needed;
-            needed.name=childs.attribute("name");
-            needed.relativePath=childs.attribute("file");
-            if (childs.hasAttribute("type"))
-                needed.type=childs.attribute("type");
-            if (childs.hasAttribute("initClass"))
-                needed.initClass=childs.attribute("initClass");
-            libs[libraryName].needs<<needed;
-            childs=childs.nextSiblingElement();
-        }
-        element=element.nextSiblingElement();
-    }
     SortLibraries(libs, readelfPath, libsPath, excludePaths);
 
     QDir path;

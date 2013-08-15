@@ -98,6 +98,10 @@ void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QS
             QStringList depends=getLibs(readelfPath, libPath.absolutePath());
             foreach(const QString & libName, depends)
             {
+                // remove circular dependencies
+                if (mapLibs[library].level == -1 && mapLibs.contains(libName) && mapLibs[libName].dependencies.contains(library))
+                    mapLibs[libName].dependencies.removeOne(library);
+
                 if (!mapLibs[library].dependencies.contains(libName))
                         mapLibs[library].dependencies<<libName;
             }
