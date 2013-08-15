@@ -78,6 +78,14 @@ static int setLevel(const QString & library, librariesMap & mapLibs)
     return maxlevel + 1;
 }
 
+
+QString niceName(const QString & name)
+{
+    if (name.startsWith("lib") && name.endsWith(".so"))
+        return name.mid(3, name.length() -6);
+    return name;
+}
+
 void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QString & path, const QStringList & excludePath)
 {
     QDir libPath;
@@ -89,7 +97,8 @@ void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QS
         libPath=it.next();
         const QString library=libPath.absolutePath().mid(libPath.absolutePath().lastIndexOf('/')+1);
         const QString relativePath=relative.relativeFilePath(libPath.absolutePath());
-        if (excludePath.contains(relativePath.left(relativePath.indexOf('/'))) && !mapLibs.contains(library))
+        if (excludePath.contains(relativePath.left(relativePath.indexOf('/'))) && !mapLibs.contains(library)
+                && !mapLibs.contains(niceName(library)))
             continue;
 
         if (!mapLibs[library].relativePath.length())
@@ -98,10 +107,6 @@ void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QS
             QStringList depends=getLibs(readelfPath, libPath.absolutePath());
             foreach(const QString & libName, depends)
             {
-                // remove circular dependencies
-                if (mapLibs[library].level == -1 && mapLibs.contains(libName) && mapLibs[libName].dependencies.contains(library))
-                    mapLibs[libName].dependencies.removeOne(library);
-
                 if (!mapLibs[library].dependencies.contains(libName))
                         mapLibs[library].dependencies<<libName;
             }
@@ -121,7 +126,7 @@ void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QS
             else
                 ++it;
         }
-        if (!mapLibs[key].dependencies.size() && mapLibs[key].level == -1)
+        if (!mapLibs[key].dependencies.size())
             mapLibs[key].level = 0;
     }
 

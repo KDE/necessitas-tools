@@ -52,6 +52,8 @@ struct Library
 
 typedef QMap<QString, Library>  librariesMap;
 
+QString niceName(const QString & name);
+
 void SortLibraries(librariesMap & libraries, const QString & readelfPath, const QString & path, const QStringList & excludePath);
 
 #endif // SORTLIBS_H

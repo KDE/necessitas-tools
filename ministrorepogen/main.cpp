@@ -59,13 +59,6 @@ static void addNeedsFile(QVector<NeedsStruct> & needs, const QString & file)
     needs << needed;
 }
 
-static QString niceName(const QString & name)
-{
-    if (name.startsWith("lib") && name.endsWith(".so"))
-        return name.mid(3, name.length() -6);
-    return name;
-}
-
 static void parseXmlFile(librariesMap &libs, const QString &xmlFile, const QString &libsPath)
 {
     QDomDocument doc("libs");
