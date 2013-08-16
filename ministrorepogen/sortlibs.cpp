@@ -52,8 +52,17 @@ static QStringList getLibs(const QString &  readelfPath, const QString & lib)
 static int setLevel(const QString & library, librariesMap & mapLibs)
 {
     int maxlevel = mapLibs[library].level;
+
+    if (maxlevel == MAX_LEVEL)
+        return 0;
+
     if (maxlevel>0)
         return maxlevel;
+
+    if (mapLibs[library].touched)
+        return maxlevel;
+
+    mapLibs[library].touched = true;
     foreach (QString lib, mapLibs[library].dependencies)
     {
         foreach (const QString & key, mapLibs.keys())
@@ -64,7 +73,7 @@ static int setLevel(const QString & library, librariesMap & mapLibs)
             {
                 int libLevel=mapLibs[key].level;
 
-                if (libLevel<0)
+                if (libLevel<0 || libLevel == MAX_LEVEL)
                     libLevel=setLevel(key, mapLibs);
 
                 if (libLevel>maxlevel)
@@ -82,8 +91,8 @@ static int setLevel(const QString & library, librariesMap & mapLibs)
 QString niceName(const QString & name)
 {
     if (name.startsWith("lib") && name.endsWith(".so"))
-        return name.mid(3, name.length() -6);
-    return name;
+        return name.mid(3, name.length() -6).trimmed();
+    return name.trimmed();
 }
 
 void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QString & path, const QStringList & excludePath)
@@ -94,22 +103,23 @@ void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QS
     QDirIterator it(path, QStringList()<<"*.so", QDir::Files, QDirIterator::Subdirectories);
     while (it.hasNext())
     {
-        libPath=it.next();
-        const QString library=libPath.absolutePath().mid(libPath.absolutePath().lastIndexOf('/')+1);
-        const QString relativePath=relative.relativeFilePath(libPath.absolutePath());
+        libPath = it.next();
+        QString library = libPath.absolutePath().mid(libPath.absolutePath().lastIndexOf('/') + 1);
+        const QString relativePath = relative.relativeFilePath(libPath.absolutePath());
         if (excludePath.contains(relativePath.left(relativePath.indexOf('/'))) && !mapLibs.contains(library)
                 && !mapLibs.contains(niceName(library)))
             continue;
 
+        if (mapLibs.contains(niceName(library)))
+            library = niceName(library);
+
         if (!mapLibs[library].relativePath.length())
             mapLibs[library].relativePath=relativePath;
 
-            QStringList depends=getLibs(readelfPath, libPath.absolutePath());
-            foreach(const QString & libName, depends)
-            {
-                if (!mapLibs[library].dependencies.contains(libName))
-                        mapLibs[library].dependencies<<libName;
-            }
+        QStringList depends = getLibs(readelfPath, libPath.absolutePath());
+        foreach(const QString & libName, depends)
+            if (!mapLibs[library].dependencies.contains(libName))
+                    mapLibs[library].dependencies<<libName;
     }
 
     // clean dependencies
@@ -118,7 +128,7 @@ void SortLibraries(librariesMap & mapLibs, const QString & readelfPath, const QS
         int it=0;
         while(it<mapLibs[key].dependencies.size())
         {
-            const QString & dependName=mapLibs[key].dependencies[it];
+            const QString & dependName = mapLibs[key].dependencies[it];
             if (!mapLibs.keys().contains(dependName) && dependName.startsWith("lib") && dependName.endsWith(".so"))
             {
                 mapLibs[key].dependencies.removeAt(it);

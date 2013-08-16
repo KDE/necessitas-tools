@@ -92,7 +92,7 @@ static void parseXmlFile(librariesMap &libs, const QString &xmlFile, const QStri
             {
                 libs[libName].relativePath = file;
                 libs[libName].name = libName;
-                libs[libName].level = 9999;
+                libs[libName].level = MAX_LEVEL;
             }
 
             if (!libs[libraryName].dependencies.contains(libName))

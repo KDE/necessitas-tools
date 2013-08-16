@@ -40,6 +40,7 @@ struct Library
     {
         level = -1;
         platform = 0;
+        touched = false;
     }
     int level;
     QString relativePath;
@@ -48,7 +49,10 @@ struct Library
     QVector<NeedsStruct> needs;
     QString name;
     int platform;
+    bool touched;
 };
+
+#define MAX_LEVEL 999999999
 
 typedef QMap<QString, Library>  librariesMap;
 
