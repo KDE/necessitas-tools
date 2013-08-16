@@ -145,6 +145,11 @@ static void parseXmlFile(librariesMap &libs, const QString &xmlFile, const QStri
     }
 }
 
+static const QString libHttpURL("\t<lib name=\"%1\" url=\"http://download.qt-project.org/ministro/android/qt5/objects/%2/%3\" file=\"%3\" size=\"%4\" sha1=\"%5\" level=\"%6\"");
+static const QString libHttpsURL("\t<lib name=\"%1\" url=\"https://download.qt-project.org/ministro/android/qt5/objects/%2/%3\" file=\"%3\" size=\"%4\" sha1=\"%5\" level=\"%6\"");
+static const QString itemHttpURL("\t\t\t<item name=\"%1\" url=\"http://download.qt-project.org/ministro/android/qt5/objects/%2/%3\" file=\"%3\" size=\"%4\" sha1=\"%5\"%6%7/>\n");
+static const QString itemHttpsURL("\t\t\t<item name=\"%1\" url=\"https://download.qt-project.org/ministro/android/qt5/objects/%2/%3\" file=\"%3\" size=\"%4\" sha1=\"%5\"%6%7/>\n");
+
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
@@ -252,7 +257,8 @@ int main(int argc, char *argv[])
                 qWarning()<<"Warning : Can't find \""<<libsPath+"/"+libs[key].relativePath<<"\" item will be skipped";
                 continue;
             }
-            outXmlFile.write(QString("\t<lib name=\"%1\" url=\"http://download.qt-project.org/ministro/android/qt5/objects/%2/%3\" file=\"%3\" size=\"%4\" sha1=\"%5\" level=\"%6\"")
+
+            outXmlFile.write(QString(libs[key].relativePath.endsWith(".js")?libHttpsURL:libHttpURL)
                              .arg(libs[key].name).arg(objfolder).arg(libs[key].relativePath).arg(fileSize).arg(sha1Hash).arg(libs[key].level).toUtf8());
             if (!libs[key].dependencies.size() && !libs[key].needs.size())
             {
@@ -298,8 +304,14 @@ int main(int argc, char *argv[])
                     if (needed.initClass.length())
                         initClass=QString(" initClass=\"%1\" ").arg(needed.initClass);
 
-                    outXmlFile.write(QString("\t\t\t<item name=\"%1\" url=\"http://download.qt-project.org/ministro/android/qt5/objects/%2/%3\" file=\"%3\" size=\"%4\" sha1=\"%5\"%6%7/>\n")
-                                     .arg(needed.name).arg(objfolder).arg(needed.relativePath.arg(platformJars[androdPlatform])).arg(fileSize).arg(sha1Hash).arg(type).arg(initClass).toUtf8());
+                    outXmlFile.write(QString((needed.relativePath.arg(platformJars[androdPlatform])).endsWith(".js")?itemHttpsURL:itemHttpURL)
+                                     .arg(needed.name)
+                                     .arg(objfolder)
+                                     .arg(needed.relativePath.arg(platformJars[androdPlatform]))
+                                     .arg(fileSize)
+                                     .arg(sha1Hash)
+                                     .arg(type)
+                                     .arg(initClass).toUtf8());
                 }
                 outXmlFile.write("\t\t</needs>\n");
             }
