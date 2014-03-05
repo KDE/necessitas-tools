@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/bin/bash -x
 
-QT_BINS=/opt/Qt5.1.0/5.1.0
-MINISTRO_REPO_VERSION=5.1014
+QT_BINS=/opt/Qt/5.2.1
+MINISTRO_REPO_VERSION=5.21
 QT_VERSION=$((0x050100))
 ANDROID_NDK_PATH=/root/necessitas/android-ndk
 RULES=rules.xml
@@ -39,8 +39,10 @@ rm -fr Qt
 rm -fr objects
 rm -fr unstable
 
+copy_qt $QT_BINS/android_armv5 armeabi
 copy_qt $QT_BINS/android_armv7 armeabi-v7a
 copy_qt $QT_BINS/android_x86 x86
 
+create_repo armeabi
 create_repo armeabi-v7a
 create_repo x86
